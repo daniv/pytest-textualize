@@ -15,6 +15,18 @@ dependencies = [
     "pydantic-extra-types (>=2.10.5,<3.0.0)",
     "pyhamcrest (>=2.1.0,<3.0.0)"
 ]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development",
+]
 
 [tool.poetry]
 packages = [{include = "pytest_textualize", from = "src"}]
@@ -28,6 +40,39 @@ mypy = "^1.16.1"
 [tool.poetry.group.test.dependencies]
 pytest-mypy = "^1.0.1"
 pyhamcrest = "^2.1.0"
+
+[tool.mypy]
+files = "src, tests"
+mypy_path = "src"
+show_error_codes = true
+strict = true
+namespace_packages = true
+explicit_package_bases = true
+enable_error_code = [
+]
+exclude = [
+    "tests/fixtures",
+    "tests/utils/fixtures",
+]
+
+[tool.black]
+line-length = 100
+verbose = true
+
+[tool.pytest.ini_options]
+minversion = "8.3"
+verbosity_assertions = 0
+python_files = ["tests_*.py"]
+python_functions = ["test_*"]
+norecursedirs = [
+    ".idea", ".pytest_cache", "src", "out", "static"
+]
+log_level = "WARNING"
+log_format = "%(message)s"
+log_date_format = "[%X]"
+addopts = [
+    "-p no:logging", "-ra", "--assert=plain", "--tb=no", "--verbosity=0"
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
