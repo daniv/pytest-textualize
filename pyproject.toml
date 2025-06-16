@@ -1,0 +1,34 @@
+[project]
+name = "pytest-textualize"
+version = "0.1.0"
+description = "Leverage rich textualize for richer test session output."
+authors = [
+    {name = "Dani Vainstein",email = "solmarkn@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "rich (>=14.0.0,<15.0.0)",
+    "pendulum (>=3.1.0,<4.0.0)",
+    "pytest (>=8.4.0,<9.0.0)",
+    "pydantic (>=2.11.7,<3.0.0)",
+    "pydantic-extra-types (>=2.10.5,<3.0.0)",
+    "pyhamcrest (>=2.1.0,<3.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "pytest_textualize", from = "src"}]
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+mypy = "^1.16.1"
+
+
+[tool.poetry.group.test.dependencies]
+pytest-mypy = "^1.0.1"
+pyhamcrest = "^2.1.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
