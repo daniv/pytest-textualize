@@ -13,7 +13,9 @@ dependencies = [
     "pytest (>=8.4.0,<9.0.0)",
     "pydantic (>=2.11.7,<3.0.0)",
     "pydantic-extra-types (>=2.10.5,<3.0.0)",
-    "pyhamcrest (>=2.1.0,<3.0.0)"
+    "pyhamcrest (>=2.1.0,<3.0.0)",
+    "pydantic-settings (>=2.9.1,<3.0.0)",
+    "glom (>=24.11.0,<25.0.0)"
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -71,8 +73,39 @@ log_level = "WARNING"
 log_format = "%(message)s"
 log_date_format = "[%X]"
 addopts = [
-    "-p no:logging", "-ra", "--assert=plain", "--tb=no", "--verbosity=0"
+    "-s", "-p no:logging", "-ra", "--assert=plain", "--tb=no", "--verbosity=0"
 ]
+
+[tool.textualize-settings.tracebacks]
+code_width = 88
+extra_lines = 3
+syntax_theme = ""
+word_wrap = true
+show_locals = false
+max_frames = 50
+max_length = 10
+max_string = 80
+enable_link_path = true
+hide_dunder = true
+hide_sunder = false
+indent_guides = true
+suppress = []
+
+[tool.textualize-settings.logging]
+log_level = "NOTSET"
+show_time = true
+show_level = true
+show_path = true
+omit_repeated_times = true
+enable_link_path = true
+highlighter = ""
+markup = false
+rich_tracebacks = false
+log_time_format = "[%X]"
+log_format = "%(message)s"
+
+
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
