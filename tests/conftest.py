@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -7,9 +8,10 @@ import pytest
 from pytest_textualize.plugins.pytest_richtrace import console_key
 from pytest_textualize.plugins.pytest_richtrace import error_console_key
 from pytest_textualize.settings import settings_key
+import pytest_textualize._lazy_rich as r
+from unittest.mock import patch
 
 if TYPE_CHECKING:
-    from pytest_textualize import TextualizeSettings
     from collections.abc import Generator
     from tests.helpers.env import SetEnv
     from rich.console import Console
@@ -36,17 +38,16 @@ def pytest_cmdline_main(config: pytest.Config) -> pytest.ExitCode | int | None:
     return None
 
 
-#
-# @pytest.hookimpl
-# def pytest_addoption(parser: pytest.Parser, pluginmanager: pytest.PytestPluginManager) -> None:
-#     group = parser.getgroup("textualize", description="testing pytest-textualize options")
-#     group.addoption(
-#         "--no-print",
-#         action="store_false",
-#         dest="console_print",
-#         default=True,
-#         help="Do not print console outputs during tests.",
-#     )
+@pytest.hookimpl
+def pytest_addoption(parser: pytest.Parser, pluginmanager: pytest.PytestPluginManager) -> None:
+    group = parser.getgroup("textualize", description="testing pytest-textualize options")
+    group.addoption(
+        "--no-print",
+        action="store_false",
+        dest="console_print",
+        default=True,
+        help="Do not print console outputs during tests.",
+    )
 
 
 class TextualizePytester:
@@ -101,22 +102,41 @@ def textualize(pytestconfig: pytest.Config) -> bool:
     return pytestconfig.getoption("textualize", False, skip=True)
 
 
-@pytest.fixture(scope="function")
-def console_print(pytestconfig: pytest.Config) -> bool:
-    return pytestconfig.option.console_print
+@pytest.fixture(name="console", autouse=False, scope="session")
+def create_output_console(pytestconfig: pytest.Config) -> Console | None:
+    if pytestconfig.option.console_print:
+        args = dict(color_system="truecolor", force_terminal=True, force_interactive=True, legacy_windows=False)
+        if not sys.stdout.isatty():
+            args["_environ"] = {"COLUMNS": "190", "TERM": "xterm-256color"}
+        console = r.Console(**args)
+        yield console
+        del console
+    else:
+        return None
+
+
+@pytest.fixture(scope="session", autouse=True)
+def turnoff_legacy_windows():
+    with patch("rich.console.detect_legacy_windows", return_value=False):
+        yield
+
+
+@pytest.fixture()
+def force_color():
+    with patch("rich.console.Console.is_terminal", return_value=True):
+        yield
 
 
 @pytest.fixture(scope="session", name="stream_console", autouse=False)
-def create_output_console(pytestconfig: pytest.Config, console_print: bool) -> Console | None:
+def get_output_console(pytestconfig: pytest.Config, console_print: bool) -> Console | None:
     if console_print:
         return pytestconfig.stash.get(console_key, None)
 
-
-@pytest.fixture(scope="session", name="consoles", autouse=False)
-def create_consoles(
-        pytestconfig: pytest.Config, console_print: bool
-) -> tuple[Console, Console] | None:
-    if console_print:
-        return pytestconfig.stash.get(console_key, None), pytestconfig.stash.get(
-            error_console_key, None
-        )
+# @pytest.fixture(scope="session", name="consoles", autouse=False)
+# def get_consoles(
+#         pytestconfig: pytest.Config, console_print: bool
+# ) -> tuple[Console, Console] | None:
+#     if console_print:
+#         return pytestconfig.stash.get(console_key, None), pytestconfig.stash.get(
+#             error_console_key, None
+#         )

@@ -65,12 +65,18 @@ init_forbid_extra = true
 warn_untyped_fields = true
 
 [[tool.mypy.overrides]]
-module = ["blib2to3.*"]
-follow_untyped_imports = true
+module = ["tests.*"]
+check_untyped_defs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
 
 [tool.black]
 line-length = 100
 verbose = true
+
+[tool.isort]
+profile = "black"
+line_length = 100
 
 [tool.pytest.ini_options]
 minversion = "8.3"

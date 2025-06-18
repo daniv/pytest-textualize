@@ -17,6 +17,7 @@ from pygments.token import (
     Whitespace,
 )
 from rich.style import Style
+from rich.syntax import ANSISyntaxTheme
 from rich.syntax import TokenType
 
 PYCHARM_DARK: dict[TokenType, Style] = {
@@ -48,3 +49,8 @@ PYCHARM_DARK: dict[TokenType, Style] = {
     Generic.Error: Style(color="bright_red"),
     Error: Style(color="red"),
 }
+
+
+class RichTextualizeSyntaxTheme(ANSISyntaxTheme):
+    def __init__(self) -> None:
+        super().__init__(PYCHARM_DARK)

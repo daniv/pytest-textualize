@@ -32,6 +32,8 @@ def locate(filename: str, cwd: Path | None = None) -> Path:
     :param cwd: An additional candidate working directory to search
     :return: The Path object
     """
+    __tracebackhide__ = True
+
     cwd = Path(cwd or Path.cwd())
     candidates = [cwd]
     candidates.extend(cwd.parents)

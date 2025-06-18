@@ -48,6 +48,7 @@ def pytest_configure(config: pytest.Config) -> None:
     import os
 
     textualize = config.getoption("textualize", False, skip=True)
+
     if int(os.getenv("LOAD_PLUGIN", 0)) == 0 or textualize is False:
         return
 
