@@ -3,7 +3,7 @@ name = "pytest-textualize"
 version = "0.1.0"
 description = "Leverage rich textualize for richer test session output."
 authors = [
-    {name = "Dani Vainstein",email = "solmarkn@gmail.com"}
+    { name = "Dani Vainstein", email = "solmarkn@gmail.com" }
 ]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -31,7 +31,7 @@ classifiers = [
 ]
 
 [tool.poetry]
-packages = [{include = "pytest_textualize", from = "src"}]
+packages = [{ include = "pytest_textualize", from = "src" }]
 
 
 [tool.poetry.group.dev.dependencies]
@@ -44,6 +44,9 @@ pytest-mypy = "^1.0.1"
 pyhamcrest = "^2.1.0"
 
 [tool.mypy]
+plugins = [
+    "pydantic.mypy"
+]
 files = "src, tests"
 mypy_path = "src"
 show_error_codes = true
@@ -56,6 +59,14 @@ exclude = [
     "tests/fixtures",
     "tests/utils/fixtures",
 ]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+warn_untyped_fields = true
+
+[[tool.mypy.overrides]]
+module = ["blib2to3.*"]
+follow_untyped_imports = true
 
 [tool.black]
 line-length = 100
@@ -76,35 +87,19 @@ addopts = [
     "-s", "-p no:logging", "-ra", "--assert=plain", "--tb=no", "--verbosity=0"
 ]
 
+[tool.textualize-settings.console]
+color_system = "truecolor"
+force_terminal = true
+legacy_windows = false
+log_time = false
+
 [tool.textualize-settings.tracebacks]
-code_width = 88
-extra_lines = 3
-syntax_theme = ""
-word_wrap = true
-show_locals = false
 max_frames = 50
-max_length = 10
-max_string = 80
-enable_link_path = true
-hide_dunder = true
-hide_sunder = false
-indent_guides = true
-suppress = []
+suppress = ["pluggy"]
 
 [tool.textualize-settings.logging]
-log_level = "NOTSET"
-show_time = true
-show_level = true
-show_path = true
-omit_repeated_times = true
-enable_link_path = true
-highlighter = ""
-markup = false
-rich_tracebacks = false
-log_time_format = "[%X]"
-log_format = "%(message)s"
-
-
+markup = true
+rich_tracebacks = true
 
 
 [build-system]

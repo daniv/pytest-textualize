@@ -3,27 +3,26 @@
 # Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
+from collections.abc import Iterable
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+from typing import ClassVar
+from typing import Literal
 from typing import TYPE_CHECKING
 
+import pytest
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import ValidationError
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
-from pathlib import Path
-from typing import Any
-from typing import Literal
-from collections.abc import Iterable
-from collections.abc import Callable
-from types import ModuleType
-from rich.highlighter import Highlighter
-import rich.text
 
 if TYPE_CHECKING:
-    import rich.style
+    from rich.syntax import SyntaxTheme
 
-    ColorSystemVariant = Literal["auto", "standard", "256", "truecolor", "windows"]
+EmojiVariant = Literal["emoji", "text"]
+ColorSystemVariant = Literal["auto", "standard", "256", "truecolor", "windows"]
 
 
 def locate(filename: str, cwd: Path | None = None) -> Path:
@@ -49,7 +48,7 @@ def locate(filename: str, cwd: Path | None = None) -> Path:
 class DotEnvSettings(BaseSettings):
     model_config = SettingsConfigDict(
         title="Pytest-Textualize DotEnv Settings Source",
-        env_file=locate(".env", Path.cwd().parent),
+        env_file=locate(".env", Path.cwd()),
         env_file_encoding="utf-8",
         case_sensitive=False,
         env_ignore_empty=False,
@@ -58,6 +57,85 @@ class DotEnvSettings(BaseSettings):
         env_parse_enums=False,
     )
     py_colors: int
+
+
+class ConsoleSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        title="Console Settings",
+        validate_default=True,
+        validate_assignment=True
+    )
+    color_system: ColorSystemVariant = Field(
+        default="auto",
+        description="he color system supported by your terminal, 'standard', '256' or 'truecolor'. Leave as 'auto' to autodetect.",
+    )
+    force_terminal: bool | None = Field(
+        None,
+        description="Enable/disable terminal control codes, or None to auto-detect terminal, default to None",
+    )
+    force_jupyter: bool | None = Field(
+        None,
+        description="Enable/disable Jupyter rendering, or None to auto-detect Jupyter. Defaults to None.",
+    )
+    force_interactive: bool | None = Field(
+        None,
+        description="Enable/disable interactive mode, or None to auto detect. Defaults to None.",
+    )
+    soft_wrap: bool = Field(
+        False, description="Set soft wrap default on print method. Defaults to False."
+    )
+    no_color: bool | None = Field(
+        None, description="Enabled no color mode, or None to auto detect. Defaults to None."
+    )
+    tab_size: int = Field(
+        8, ge=4, description="Number of spaces used to replace a tab character. Defaults to 8."
+    )
+    markup: bool = Field(True, description="Enable/disable markup mode. Defaults to True.")
+    emoji: bool = Field(True, description="Enable/disable emoji mode. Defaults to True.")
+    emoji_variant: EmojiVariant | None = Field(
+        None, description="Optional emoji variant, either 'text' or 'emoji'. Defaults to None."
+    )
+    highlight: bool = Field(
+        True, description="Enable/disable automatic highlight mode. Defaults to True."
+    )
+    log_time: bool = Field(
+        True,
+        description="Boolean to enable logging of time by <method: log> methods. Defaults to True.",
+    )
+    log_path: bool = Field(
+        True, description="the logging of the caller by <method: log>. Defaults to True."
+    )
+    highlighter: str | None = Field(
+        None, description="Default highlighter is rich.highlighter.ReprHighlighter."
+    )
+    theme: str | None = Field(
+        None, description=" An optional style theme object, or None for default theme."
+    )
+    legacy_windows: bool | None = Field(
+        None, description="Enable legacy Windows mode, or None to auto detect. Defaults to None"
+    )
+    safe_box: bool | None = Field(
+        None, description="Restrict box options that don't render on legacy Windows."
+    )
+
+    @property
+    def terminal_size_fallback(self) -> dict[int, int]:
+        return {"COLUMNS": "190", "LINES": "25"}
+
+    # styles_path: str | None = Field(
+    #     "static/styles/textualize_styles.ini", description="Path to the styles file"
+    # )
+
+    def model_post_init(self, context: Any, /) -> None:
+        from pydantic_settings import PyprojectTomlConfigSettingsSource
+
+        obj = PyprojectTomlConfigSettingsSource(
+            TextualizePyProjectSettings, locate("pyproject.toml")
+        )
+        for k, v in obj.toml_data.get("console", {}).items():
+            if k == "styles_path":
+                v = Path(v).resolve()
+            setattr(self, k, v)
 
 
 class PyprojectModel(BaseModel):
@@ -86,14 +164,16 @@ class TracebacksSettingsModel(BaseModel):
         title="Tracebacks Configuration Settings",
         validate_default=True,
         validate_assignment=True,
+        populate_by_name=True,
         extra="forbid",
     )
     code_width: int = Field(
         88, description="Number of code characters used to render tracebacks.", gt=80
     )
     extra_lines: int = Field(3, description="Additional lines of code to render tracebacks.", ge=0)
-    syntax_theme: str | None = Field(
+    syntax_theme: str = Field(
         "ansi_dark",
+        alias="theme",
         title="Tracebacks Theme",
         description="Override pygments theme used in traceback.",
     )
@@ -124,6 +204,16 @@ class TracebacksSettingsModel(BaseModel):
         )
         for k, v in obj.toml_data.get("tracebacks", {}).items():
             setattr(self, k, v)
+
+    def get_syntax_theme(self) -> SyntaxTheme:
+        from rich.syntax import Syntax
+
+        if self.syntax_theme == "pycharm_dark":
+            from rich.syntax import ANSISyntaxTheme
+            from pytest_textualize.textualize.syntax import PYCHARM_DARK
+
+            return ANSISyntaxTheme(PYCHARM_DARK)
+        return Syntax.get_theme(self.syntax_theme)
 
 
 class LoggingSettingsModel(TracebacksSettingsModel):
@@ -176,25 +266,15 @@ class TextualizeSettings(BaseSettings):
     model_config = SettingsConfigDict(title="Pytest Textualize Settings")
     env: DotEnvSettings = Field(default_factory=DotEnvSettings)
     pyproject: PyprojectModel = Field(default_factory=PyprojectModel)
-    tracebacks: TracebacksSettingsModel | None = Field(
+    tracebacks_settings: TracebacksSettingsModel | None = Field(
         default_factory=TracebacksSettingsModel,
         description="The rich tracebacks settings",
     )
-    logging: LoggingSettingsModel = Field(
+    logging_settings: LoggingSettingsModel = Field(
         default_factory=LoggingSettingsModel,
         description="The rich logging settings",
     )
+    console_settings: ConsoleSettings = Field(default_factory=ConsoleSettings)
 
 
-try:
-    _TEXTUALIZE_SETTINGS = TextualizeSettings()
-except ValidationError as e:
-    for err in e.errors():
-        pass
-
-# _TEXTUALIZE_SETTINGS = TextualizeSettings()
-
-
-def get_textualize_settings() -> TextualizeSettings:
-    global _TEXTUALIZE_SETTINGS
-    return _TEXTUALIZE_SETTINGS
+settings_key = pytest.StashKey[TextualizeSettings]()

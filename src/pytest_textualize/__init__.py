@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from pytest_textualize.textualize.settings import get_textualize_settings, locate
+from importlib import metadata
 
-__all__ = ("get_textualize_settings", "locate")
+__version__ = metadata.version("pytest_textualize")
 
+__all__ = ["TextualizeSettings", "ConsoleFactory"]
 
-def setup_pytest_textualize():
-    from dotenv import load_dotenv
-
-    locate("")
-    load_dotenv()
-
-    settings = get_textualize_settings()
+from pytest_textualize.console_factory import ConsoleFactory
+from pytest_textualize.settings import TextualizeSettings
