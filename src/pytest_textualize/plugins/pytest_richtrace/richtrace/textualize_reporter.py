@@ -72,6 +72,11 @@ class TextualizeReporter:
         )
         self.console.print(panel)
 
+    @pytest.hookimpl
+    def pytest_addhooks(self, pluginmanager: pytest.PytestPluginManager) -> None:
+        from pytest_textualize.plugins.pytest_richtrace.hookspecs import ReportingHookSpecs
+        pluginmanager.add_hookspecs(ReportingHookSpecs)
+
     @pytest.hookimpl(trylast=True)
     def pytest_plugin_registered(self, plugin: PytestPlugin, plugin_name: str) -> None:
         if plugin_name is None or self.verbosity < Verbosity.VERBOSE:
