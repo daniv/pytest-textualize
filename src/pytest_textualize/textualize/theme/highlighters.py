@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from rich.highlighter import RegexHighlighter
-from rich.highlighter import ReprHighlighter
 
 
 class ArgparseArgsHighlighter(RegexHighlighter):

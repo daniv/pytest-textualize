@@ -31,6 +31,14 @@ class PytestRichTracer:
     def verbosity(self) -> Verbosity:
         return self.settings.verbosity
 
+    @property
+    def no_header(self) -> bool:
+        return bool(self.config.option.no_header)
+
+    @property
+    def show_header(self) -> bool:
+        return self.verbosity >= Verbosity.NORMAL
+
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__} "

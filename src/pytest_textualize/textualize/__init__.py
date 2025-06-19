@@ -8,6 +8,13 @@ from enum import IntEnum
 from pytest_textualize.settings import locate
 from pytest_textualize.textualize.theme.highlighters import ArgparseArgsHighlighter
 from pytest_textualize.textualize.theme.highlighters import BuiltInsExceptionsHighlighter
+from pytest_textualize.textualize.theme.styles.error_report_styles import ERREP_COLOR_THEMES
+from pytest_textualize.textualize.theme.styles.error_report_styles import ERREP_CAUSE
+from pytest_textualize.textualize.theme.styles.error_report_styles import ERREP_COLON
+from pytest_textualize.textualize.theme.styles.error_report_styles import ERREP_GROUPS
+from pytest_textualize.textualize.theme.styles.error_report_styles import ERREP_ARGS
+from pytest_textualize.textualize.theme.styles.error_report_styles import ERREP_EXCTYPE
+from pytest_textualize.textualize.theme.styles.error_report_styles import STYLE_PREFIX
 from pytest_textualize.textualize.theme.syntax import RichTextualizeSyntaxTheme
 from pytest_textualize.textualize.theme.terminal_theme import TEXTUALIZE_TERMINAL_THEME
 
@@ -18,6 +25,7 @@ __all__ = (
     "TEXTUALIZE_TERMINAL_THEME",
     "RichTextualizeSyntaxTheme",
     "TextualizeTheme",
+    "ERREP_COLOR_THEMES", "ERREP_CAUSE", "ERREP_COLON", "ERREP_GROUPS", "ERREP_ARGS", "ERREP_EXCTYPE", "STYLE_PREFIX"
 )
 
 from pytest_textualize.textualize.theme.themes import TextualizeTheme
