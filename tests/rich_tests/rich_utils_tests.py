@@ -4,17 +4,29 @@
 
 from __future__ import annotations
 
+import sys
+import warnings
 from typing import TYPE_CHECKING
 
 import pytest
 from hamcrest import assert_that
 from hamcrest import equal_to
+from lark import Lark, logger
+
+try:
+    from interegular import logger as interegular_logger
+
+    has_interegular = True
+except ImportError:
+    has_interegular = False
 
 import pytest_textualize._lazy_rich as r
 from pytest_textualize.rich_utils import rich_strip
 from pytest_textualize.rich_utils import rich_wrap
 from pytest_textualize.textualize.theme.themes import TextualizeTheme
 from rich_tests import LOREM_SHORT
+from argparse import ArgumentParser, FileType
+from textwrap import indent
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -43,3 +55,21 @@ def test_rich_wrap(console: r.Console) -> None:
     if console:
         console.line(1)
         console.print(wrapped)
+
+
+def test_argparse(pytestconfig: pytest.Config) -> None:
+    import argparse
+    parser = pytestconfig._parser
+    groups = parser._groups
+    parser = pytestconfig.getoption("--pytest-textualize")
+
+    arg_parser = argparse.ArgumentParser(prog='python -m lark.tools.serialize',
+                                         description="Lark Serialization Tool - Stores Lark's internal state & LALR analysis as a JSON file",
+                                         epilog='Look at the Lark documentation for more info on the options')
+    new_parser = argparse.ArgumentParser(add_help=False)
+    # for option in self.definition.options:
+    #     parser.add_argument(
+    #         f"--{option.name}",
+    #         *([f"-{option.shortcut}"] if option.shortcut else []),
+    #         action="store_true" if option.is_flag() else "store",
+    #     )

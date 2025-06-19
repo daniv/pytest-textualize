@@ -48,8 +48,9 @@ def pytest_configure(config: pytest.Config) -> None:
     import os
 
     textualize = config.getoption("textualize", False, skip=True)
+    from pytest_textualize import get_bool_opt
 
-    if int(os.getenv("LOAD_PLUGIN", 0)) == 0 or textualize is False:
+    if get_bool_opt("env.LOAD_PLUGIN", os.getenv("LOAD_PLUGIN", 0)) or textualize is False:
         return
 
     path = dotenv.find_dotenv(".env")
