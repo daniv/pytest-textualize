@@ -3,19 +3,18 @@
 # Dir Path : src/pytest_textualize/plugins/pytest_richtrace
 from __future__ import annotations
 
+from typing import Any
+from typing import Generator
 from typing import TYPE_CHECKING
 
 import pytest
-from dotenv import load_dotenv
 
 from pytest_textualize import ConsoleFactory
-from pytest_textualize.settings import settings_key
-from pytest_textualize.textualize import locate
 from pytest_textualize.settings import TextualizeSettings
-from rich.console import Console
+from pytest_textualize.settings import settings_key
 
 if TYPE_CHECKING:
-    pass
+    from _pytest._code import code as pytest_code
 
 PLUGIN_NAME = "pytest-textualize"
 
@@ -44,49 +43,71 @@ def pytest_addoption(parser: pytest.Parser, pluginmanager: pytest.PytestPluginMa
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: pytest.Config) -> None:
-    import dotenv
-    import os
-
-    textualize = config.getoption("textualize", False, skip=True)
-    from pytest_textualize import get_bool_opt
-
-    if get_bool_opt("env.LOAD_PLUGIN", os.getenv("LOAD_PLUGIN", 0)) or textualize is False:
+    # -- validates that the plugin option was set to true
+    if not config.getoption("--textualize", False, skip=True):
         return
 
-    path = dotenv.find_dotenv(".env")
-    assert path is not None, ".env file not found"
-    dotenv.load_dotenv(dotenv_path=path, override=True, verbose=True)
-
-    from pytest_textualize.plugins.pytest_richtrace import console_key
+    # -- Loading settings and store it into the stash
     from pytest_textualize.settings import settings_key
-    from pytest_textualize.plugins.pytest_richtrace import error_console_key
 
     _settings = TextualizeSettings()
     config.stash.setdefault(settings_key, _settings)
+    _settings.verbosity = config.getoption("--verbose")
+
+    # --load output console and error console, store them into the stash
+    from pytest_textualize.plugins.pytest_richtrace import console_key
+    from pytest_textualize.plugins.pytest_richtrace import error_console_key
+    from pytest_textualize.console_factory import push_theme
 
     ConsoleFactory.stash = config.stash
-    _stream_console = ConsoleFactory.console_output()
+    _stream_console = ConsoleFactory.console_output(config)
     config.stash.setdefault(console_key, _stream_console)
+    push_theme(config.rootpath, _stream_console, _settings)
 
-    _error_stream_console = ConsoleFactory.console_error_output()
+    _error_stream_console = ConsoleFactory.console_error_output(config)
     config.stash.setdefault(error_console_key, _error_stream_console)
+    push_theme(config.rootpath, _error_stream_console, _settings)
+    from pytest_textualize.textualize.theme.styles import print_styles
+
+    print_styles(_stream_console, "truecolor")
 
     # -- Adding the pycharm dark theme to RICH_SYNTAX_THEMES
-    from rich.syntax import RICH_SYNTAX_THEMES
-    from pytest_textualize.textualize.syntax import PYCHARM_DARK
 
-    RICH_SYNTAX_THEMES["pycharm_dark"] = PYCHARM_DARK
+    # from pytest_textualize.textualize.theme.syntax import PYCHARM_DARK
+    # RICH_SYNTAX_THEMES["pycharm_dark"] = PYCHARM_DARK
 
-    from pytest_textualize.plugins.pytest_richtrace.richtrace.tracer import PytestRichTracer
+    # -- registering the main tracer plugin class
+    from ..pytest_richtrace.richtrace.tracer import TextualizeTracer
 
-    tracer = PytestRichTracer(config)
-    config.pluginmanager.register(tracer, PytestRichTracer.name)
+    tracer = TextualizeTracer(config)
+    config.pluginmanager.register(tracer, TextualizeTracer.name)
 
+    # -- send historic hook to all the plugins that not registered yet
     config.pluginmanager.hook.pytest_console_and_settings.call_historic(
         kwargs=dict(
             console=_stream_console, error_console=_error_stream_console, settings=_settings
         )
     )
+
+
+@pytest.hookimpl
+def pytest_internalerror(excrepr: pytest_code.ExceptionRepr) -> bool | None:
+    from rich import print
+
+    print(excrepr.reprcrash.message)
+    print(f"{excrepr.reprcrash.path}:{excrepr.reprcrash.lineno}")
+    return False
+
+
+@pytest.hookimpl(tryfirst=True, wrapper=True)
+def pytest_unconfigure(config: pytest.Config) -> Generator[None, Any, None]:
+    from ..pytest_richtrace.richtrace.tracer import TextualizeTracer
+
+    if config.pluginmanager.hasplugin(TextualizeTracer.name):
+        plugin = config.pluginmanager.getplugin(TextualizeTracer.name)
+        config.pluginmanager.hook.pytest_plugin_unregistered(plugin=plugin)
+        yield
+        config.pluginmanager.unregister(plugin)
 
 
 @pytest.fixture(scope="session")
@@ -95,6 +116,7 @@ def textualize_option(pytestconfig: pytest.Config) -> bool:
 
 
 @pytest.fixture(scope="session", autouse=False, name="settings")
-def settings(pytestconfig: pytest.Config, textualize_option: bool) -> TextualizeSettings:
+def settings(pytestconfig: pytest.Config, textualize_option: bool) -> TextualizeSettings | None:
     if textualize_option:
         return pytestconfig.stash.get(settings_key, None)
+    return None

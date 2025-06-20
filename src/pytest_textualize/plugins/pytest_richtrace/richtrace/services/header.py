@@ -3,38 +3,39 @@
 # Dir Path : src/pytest_textualize/plugins/pytest_richtrace/richtrace/services
 from __future__ import annotations
 
-from pathlib import Path
-from pprint import saferepr
 import os
-from typing import Any
-from typing import Generator
+import re
+import shlex
+from pathlib import Path
 from typing import Generator
 from typing import MutableMapping
 from typing import TYPE_CHECKING
 from typing import cast
-import re
-import shlex
-import subprocess
-import warnings
+
 import pytest
-import shlex
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import Any
     from pluggy._manager import DistFacade
 
+to_kebab_case = lambda s: s.lower().replace(" ", "_")
+
 
 class PytestCollectorService:
     name = "pytest-collector-service"
 
     @pytest.hookimpl(tryfirst=True)
-    def pytest_collect_env_info(self, config: pytest.Config) -> dict[str, Any]:
-        return dict(
-            pytest_ver=pytest.__version__,
-            rootdir=config.rootpath,
-            invocation_params=shlex.join(config.invocation_params.args),
-        )
+    def pytest_collect_env_info(self, config: pytest.Config) -> dict[str, str]:
+        return {
+            to_kebab_case("pytest version"): pytest.__version__,
+            "rootdir": config.rootpath.as_posix(),
+            "configfile": config.inipath.name,
+            "invocation_params": shlex.join(config.invocation_params.args),
+        }
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} name='{self.name}'>"
 
 
 class PluggyCollectorService:
@@ -131,17 +132,21 @@ class PluggyCollectorService:
 
         return names
 
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} name='{self.name}'>"
+
 
 class PoetryCollectorService:
     name = "poetry-collector-service"
 
     @pytest.hookimpl(trylast=True)
-    def pytest_collect_env_info(self) -> dict[str, Any] | None:
+    def pytest_collect_env_info(self, config: pytest.Config) -> dict[str, Any] | None:
         from pytest_textualize import __version__
 
-        output = os.popen("poetry show -l -T").read()
-        if output:
-            packages = self.generate_output(output.splitlines())
+        if config.getoption("--trace-config"):
+            output = os.popen("poetry show -l -T").read()
+            if output:
+                packages = self.generate_output(output.splitlines())
         result_ver = os.popen("poetry show -V").read()
         return dict(
             poetry_version=re.findall("[0-9.]+", result_ver.strip())[0],
@@ -159,7 +164,11 @@ class PoetryCollectorService:
         for name, current_ver, latest_ver in packs:
             try:
                 comp = semver.Version.parse(str(current_ver)).compare(str(latest_ver))
-                latest_ver = f"[bright_red]{latest_ver}[/]" if comp < 0 else f"[bright_green]{latest_ver}[/]"
+                latest_ver = (
+                    f"[poetry.outdated]{latest_ver}[/]"
+                    if comp < 0
+                    else f"[poetry.actual]{latest_ver}[/]"
+                )
                 pack = dict(
                     name=name,
                     current_ver=current_ver,
@@ -171,6 +180,9 @@ class PoetryCollectorService:
                 pass
 
         return packages
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} name='{self.name}'>"
 
 
 class PythonCollectorService:
@@ -197,10 +209,10 @@ class PythonCollectorService:
 
         return dict(
             platform=f"{sys.platform} - {platform.platform()}",
-            python=platform.python_version(),
+            python_version=platform.python_version(),
             python_ver_info=".".join(map(str, sys.version_info)),
-            pypy=locals().get("pypy_kv", None),
-            executable=Path(sys.executable).relative_to(config.rootpath).as_posix(),
+            pypy_version=locals().get("pypy_kv", None),
+            python_executable=Path(sys.executable).relative_to(config.rootpath).as_posix(),
         )
 
     def __repr__(self) -> str:
@@ -217,19 +229,25 @@ class HookHeaderCollectorService:
             config=config, start_path=config.invocation_params.dir
         )
         for line_or_lines in lines:
-            if not line_or_lines: continue
+            if not line_or_lines:
+                continue
             if isinstance(line_or_lines, str):
                 line_or_lines = [line_or_lines]
-            if bool(line_or_lines[0].find("using") >= 0): continue
+            if bool(line_or_lines[0].find("using") >= 0):
+                continue
             for line in line_or_lines:
                 partition = list(map(str.strip, line.partition(": ")))
-                if len(partition) > 3: continue
+                if len(partition) > 3:
+                    continue
                 match partition[0]:
                     case "plugins" | "rootdir":
                         pass
                     case _:
                         data[partition[0]] = partition[2]
         return data
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} name='{self.name}'>"
 
 
 class CollectorWrapper:
@@ -247,6 +265,9 @@ class CollectorWrapper:
             maps.append(child)
 
         return ChainMap(*maps)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} name='{self.name}'>"
 
 
 class HeaderServiceManager:

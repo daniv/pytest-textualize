@@ -10,12 +10,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 import rich.console
-from boltons.iterutils import first
 from hamcrest import assert_that
 from hamcrest import equal_to
 from hamcrest import instance_of
-from hamcrest import not_none, none
-from hamcrest import is_not
+from hamcrest import none
+from hamcrest import not_none
 
 from pytest_textualize import ConsoleFactory
 from pytest_textualize import TextualizeSettings
@@ -38,7 +37,9 @@ def test_console_output(pytestconfig: pytest.Config) -> None:
     stash_console = pytestconfig.stash.get(console_key, None)
     assert_that(stash_console, not_none(), "console stashed")
 
-    assert_that(stash_console, instance_of(rich.console.Console), "instance of rich.console.Console")
+    assert_that(
+        stash_console, instance_of(rich.console.Console), "instance of rich.console.Console"
+    )
     assert_that(stash_console.stderr, equal_to(False), "stderr")
     assert_that(stash_console.file, instance_of(TextIOWrapper), "file sys.stdout (stream)")
     assert_that(stash_console, equal_to(console), "console same as the stashed")
@@ -52,7 +53,9 @@ def test_console_error_output(pytestconfig: pytest.Config) -> None:
     stash_console = pytestconfig.stash.get(error_console_key, None)
     assert_that(stash_console, not_none(), "console stashed")
 
-    assert_that(stash_console, instance_of(rich.console.Console), "instance of rich.console.Console")
+    assert_that(
+        stash_console, instance_of(rich.console.Console), "instance of rich.console.Console"
+    )
     assert_that(stash_console.stderr, equal_to(True), "stderr")
     assert_that(stash_console.file, instance_of(TextIOWrapper), "file sys.stdout (stream)")
     assert_that(stash_console.style, equal_to("red"), "style")

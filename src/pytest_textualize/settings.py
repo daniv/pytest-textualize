@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from collections.abc import Mapping
+from enum import IntEnum
 from pathlib import Path
 from typing import Any
-from typing import ClassVar
 from typing import Literal
 from typing import TYPE_CHECKING
 
@@ -23,6 +23,12 @@ if TYPE_CHECKING:
 
 EmojiVariant = Literal["emoji", "text"]
 ColorSystemVariant = Literal["auto", "standard", "256", "truecolor", "windows"]
+
+STYLE_INI_FILES: Mapping[str, Path] = {
+    "truecolor": Path("static/styles") / "truecolor_styles.ini",
+    "standard": Path("static/styles") / "standard_styles.ini",
+    "eight_bit": Path("static/styles") / "eight_bit_styles.ini",
+}
 
 
 def locate(filename: str, cwd: Path | None = None) -> Path:
@@ -47,6 +53,14 @@ def locate(filename: str, cwd: Path | None = None) -> Path:
     raise FileNotFoundError(f"Could not located the file '{filename}'")
 
 
+class Verbosity(IntEnum):
+    QUIET = -1  # --quiet
+    NORMAL = 0
+    VERBOSE = 1  # -v
+    VERY_VERBOSE = 2  # -vv
+    DEBUG = 3  # -vvv
+
+
 class DotEnvSettings(BaseSettings):
     model_config = SettingsConfigDict(
         title="Pytest-Textualize DotEnv Settings Source",
@@ -63,9 +77,7 @@ class DotEnvSettings(BaseSettings):
 
 class ConsoleSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        title="Console Settings",
-        validate_default=True,
-        validate_assignment=True
+        title="Console Settings", validate_default=True, validate_assignment=True
     )
     color_system: ColorSystemVariant = Field(
         default="auto",
@@ -121,7 +133,7 @@ class ConsoleSettings(BaseSettings):
     )
 
     @property
-    def terminal_size_fallback(self) -> dict[int, int]:
+    def terminal_size_fallback(self) -> dict[str, str]:
         return {"COLUMNS": "190", "LINES": "25"}
 
     # styles_path: str | None = Field(
@@ -277,6 +289,8 @@ class TextualizeSettings(BaseSettings):
         description="The rich logging settings",
     )
     console_settings: ConsoleSettings = Field(default_factory=ConsoleSettings)
+    verbosity: Verbosity = Field(Verbosity.NORMAL)
+    style_files: Mapping[str, Path] = Field(STYLE_INI_FILES, frozen=True)
 
 
 settings_key = pytest.StashKey[TextualizeSettings]()

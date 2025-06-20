@@ -16,12 +16,12 @@ from hamcrest import equal_to
 from hamcrest import has_key
 from hamcrest import has_length
 from hamcrest import not_
+from rich.traceback import Traceback
 
 from pytest_textualize import TextualizeSettings
-from pytest_textualize.settings import TracebacksSettingsModel
 from pytest_textualize.settings import ConsoleSettings
+from pytest_textualize.settings import TracebacksSettingsModel
 from pytest_textualize.textualize import locate
-from rich.traceback import Traceback
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -118,6 +118,7 @@ def test_console_settings_not_none_properties() -> None:
 
 def test_console_settings_from_settings() -> None:
     from glom import glom
+
     console_settings = ConsoleSettings()
     textualize_settings = TextualizeSettings()
     toml_settings = glom(textualize_settings.pyproject, "data.tool.textualize-settings.console")
@@ -155,8 +156,13 @@ def test_pygments_syntax_theme(stream_console: Console | None, pygments_theme: s
             raise ValueError("A value error")
 
     tb = Traceback.from_exception(
-        exc_info.type, exc_info.value, exc_info.tb, show_locals=True, max_frames=100,
-        theme=traceback_settings.syntax_theme, width=stream_console.width - 10
+        exc_info.type,
+        exc_info.value,
+        exc_info.tb,
+        show_locals=True,
+        max_frames=100,
+        theme=traceback_settings.syntax_theme,
+        width=stream_console.width - 10,
     )
     stream_console.line(2)
     stream_console.rule(f"Traceback for '{pygments_theme}' pygments syntax theme", characters="=")
@@ -172,8 +178,13 @@ def test_pycharm_dark_theme(stream_console: Console | None, theme: str) -> None:
             raise ValueError("A value error")
 
     tb = Traceback.from_exception(
-        exc_info.type, exc_info.value, exc_info.tb, show_locals=True, max_frames=100,
-        theme=traceback_settings.syntax_theme, width=stream_console.width - 10
+        exc_info.type,
+        exc_info.value,
+        exc_info.tb,
+        show_locals=True,
+        max_frames=100,
+        theme=traceback_settings.syntax_theme,
+        width=stream_console.width - 10,
     )
     stream_console.line(2)
     stream_console.rule(f"Traceback for '{theme}' pygments syntax theme", characters="=")

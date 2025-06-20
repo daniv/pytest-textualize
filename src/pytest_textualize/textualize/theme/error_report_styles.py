@@ -31,7 +31,7 @@ ERREP_SYNTAX = build_style_name("syntax")
 ERRREP_DESCRIPTION = build_style_name("description")
 
 ERREP_COLOR_THEMES: dict[str, dict[str, StyleType]] = {
-    'default': {
+    "default": {
         ERREP_ARGS: Style(color="cyan"),
         ERREP_DEFAULT: Style(color=Color.from_ansi(245)),
         ERREP_TEXT: Style(color="default"),
@@ -49,7 +49,7 @@ ERREP_COLOR_THEMES: dict[str, dict[str, StyleType]] = {
         ERREP_HELP: Style(color=Color.from_ansi(114), italic=True),
         ERREP_EXCTYPE: Style(color=Color.from_ansi(83)),
         ERREP_CAUSE: Style(color=Color.from_ansi(235), bold=True),
-        ERREP_SYNTAX: Style(color=Color.from_ansi(156), bold=True)
+        ERREP_SYNTAX: Style(color=Color.from_ansi(156), bold=True),
     },
     "morning_glory": {
         ERREP_ARGS: Style(color=Color.from_ansi(230), bold=True, dim=True),
@@ -59,7 +59,7 @@ ERREP_COLOR_THEMES: dict[str, dict[str, StyleType]] = {
         ERREP_EXCTYPE: Style(color=Color.from_ansi(184)),
         ERREP_CAUSE: Style(color=Color.from_ansi(208), bold=True),
         ERREP_SYNTAX: Style(color=Color.from_ansi(190), bold=True),
-    }
+    },
 }
 
 for theme in ERREP_COLOR_THEMES.values():

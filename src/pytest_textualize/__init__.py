@@ -11,5 +11,12 @@ from pytest_textualize.settings import TextualizeSettings
 from pytest_textualize.settings import TracebacksSettingsModel
 from pytest_textualize.settings import LoggingSettingsModel
 
-__all__ = ["TextualizeSettings", "ConsoleFactory", "ConsoleSettings", "TracebacksSettingsModel", "LoggingSettingsModel",
-           "get_bool_opt"]
+__all__ = [
+    "TextualizeSettings",
+    "ConsoleFactory",
+    "ConsoleSettings",
+    "TracebacksSettingsModel",
+    "LoggingSettingsModel",
+    "get_bool_opt",
+    "__version__",
+]
