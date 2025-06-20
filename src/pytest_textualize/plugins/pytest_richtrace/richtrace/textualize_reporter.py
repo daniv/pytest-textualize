@@ -113,6 +113,22 @@ class TextualizeReporter:
         return None
 
     @pytest.hookimpl
+    def pytest_report_make_collect_report(self, collector: pytest.Collector) -> None:
+        if self.verbosity < Verbosity.VERBOSE:
+            return
+
+        if isinstance(collector, pytest.Session):
+            info = f"pytest.Session {collector.nodeid}"
+        elif isinstance(collector, pytest.Directory):
+            info = f"pytest.Directory {collector.nodeid}"
+        elif isinstance(collector, pytest.File):
+            info = f"pytest.File {collector.nodeid}"
+        else:
+            raise NotImplementedError
+        hm = HookMessage("pytest_make_collect_report", info=info)
+        self.console.print(hm)
+
+    @pytest.hookimpl
     def pytest_plugin_unregistered(self, plugin: PytestPlugin) -> None:
         if self.verbosity > Verbosity.NORMAL:
             if hasattr(plugin, "name"):

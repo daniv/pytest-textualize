@@ -89,7 +89,7 @@ python_functions = ["test_*"]
 norecursedirs = [
     ".idea", ".pytest_cache", "src", "out", "static"
 ]
-log_level = "WARNING"
+log_level = "ERROR"
 log_format = "%(message)s"
 log_date_format = "[%X]"
 addopts = [
@@ -103,14 +103,13 @@ legacy_windows = false
 log_time = false
 
 [tool.textualize-settings.tracebacks]
+theme = "pycharm_dark"
 max_frames = 50
 suppress = ["pluggy"]
 
 [tool.textualize-settings.logging]
-markup = true
 rich_tracebacks = true
-syntax_theme = "pycharm_dark"
-
+tracebacks_theme = "pycharm_dark"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

@@ -50,31 +50,32 @@ def pytest_configure(config: pytest.Config) -> None:
     # -- Loading settings and store it into the stash
     from pytest_textualize.settings import settings_key
 
-    _settings = TextualizeSettings()
+    _settings = TextualizeSettings(pytest_config=config)
     config.stash.setdefault(settings_key, _settings)
-    _settings.verbosity = config.getoption("--verbose")
 
     # --load output console and error console, store them into the stash
     from pytest_textualize.plugins.pytest_richtrace import console_key
     from pytest_textualize.plugins.pytest_richtrace import error_console_key
-    from pytest_textualize.console_factory import push_theme
 
     ConsoleFactory.stash = config.stash
     _stream_console = ConsoleFactory.console_output(config)
     config.stash.setdefault(console_key, _stream_console)
-    push_theme(config.rootpath, _stream_console, _settings)
+    _stream_console.log("hehehe")
 
     _error_stream_console = ConsoleFactory.console_error_output(config)
     config.stash.setdefault(error_console_key, _error_stream_console)
-    push_theme(config.rootpath, _error_stream_console, _settings)
     from pytest_textualize.textualize.theme.styles import print_styles
 
     print_styles(_stream_console, "truecolor")
 
     # -- Adding the pycharm dark theme to RICH_SYNTAX_THEMES
+    from pytest_textualize.textualize.theme.syntax import PYCHARM_DARK
+    from rich.syntax import RICH_SYNTAX_THEMES
+    RICH_SYNTAX_THEMES["pycharm_dark"] = PYCHARM_DARK
 
-    # from pytest_textualize.textualize.theme.syntax import PYCHARM_DARK
-    # RICH_SYNTAX_THEMES["pycharm_dark"] = PYCHARM_DARK
+    # -- after having all configuration we start the logging handler
+    from pytest_textualize import configure_logging
+    configure_logging(_stream_console, _settings)
 
     # -- registering the main tracer plugin class
     from ..pytest_richtrace.richtrace.tracer import TextualizeTracer
@@ -99,15 +100,15 @@ def pytest_internalerror(excrepr: pytest_code.ExceptionRepr) -> bool | None:
     return False
 
 
-@pytest.hookimpl(tryfirst=True, wrapper=True)
-def pytest_unconfigure(config: pytest.Config) -> Generator[None, Any, None]:
-    from ..pytest_richtrace.richtrace.tracer import TextualizeTracer
-
-    if config.pluginmanager.hasplugin(TextualizeTracer.name):
-        plugin = config.pluginmanager.getplugin(TextualizeTracer.name)
-        config.pluginmanager.hook.pytest_plugin_unregistered(plugin=plugin)
-        yield
-        config.pluginmanager.unregister(plugin)
+# @pytest.hookimpl(tryfirst=True, wrapper=True)
+# def pytest_unconfigure(config: pytest.Config) -> Generator[None, Any, None]:
+#     from ..pytest_richtrace.richtrace.tracer import TextualizeTracer
+#
+#     if config.pluginmanager.hasplugin(TextualizeTracer.name):
+#         plugin = config.pluginmanager.getplugin(TextualizeTracer.name)
+#         config.pluginmanager.hook.pytest_plugin_unregistered(plugin=plugin)
+#         yield
+#         config.pluginmanager.unregister(plugin)
 
 
 @pytest.fixture(scope="session")

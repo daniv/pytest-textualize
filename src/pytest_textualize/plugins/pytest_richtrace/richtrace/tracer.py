@@ -89,6 +89,7 @@ class TextualizeTracer:
         self.test_results.start = DateTime.now()
         self._start_time = self.test_results.start.to_time_string()
         session.name = "pyest-textualize"
+        self.settings.verbosity = Verbosity(session.config.option.verbose)
 
         from .collector_observer import CollectionObserver
 
@@ -98,7 +99,7 @@ class TextualizeTracer:
         if not self.show_header:
             return
         self.console.rule(
-            f"[#D1F8EF]Session '{session.name}' starts", characters="=", style="#A1E3F9"
+            f"[#D1F8EF]Session '{session.name}' started at {self._start_time}", characters="=", style="#A1E3F9"
         )
         if not self.no_header:
             from .services.header import HeaderServiceManager

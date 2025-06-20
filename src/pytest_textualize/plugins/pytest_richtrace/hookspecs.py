@@ -48,3 +48,7 @@ class ReportingHookSpecs:
     @pytest.hookspec(firstresult=True)
     def pytest_render_header(self, config: pytest.Config, data: MutableMapping[str, Any]) -> bool:
         pass
+
+    @pytest.hookspec  # (firstresult=True)
+    def pytest_report_make_collect_report(self, collector: pytest.Collector) -> None:
+        pass
