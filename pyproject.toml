@@ -109,6 +109,7 @@ suppress = ["pluggy"]
 [tool.textualize-settings.logging]
 markup = true
 rich_tracebacks = true
+syntax_theme = "pycharm_dark"
 
 
 [build-system]
