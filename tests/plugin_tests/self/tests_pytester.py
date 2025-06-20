@@ -39,6 +39,6 @@ def test_help_message(textualize_pytester: TextualizePytester) -> None:
         [
             "*textualize:*",
             "*--textualize*Enable rich terminal reporting using pytest-textualize.  Default to False*",
-            "*dotenv_path (string): path to .env file*"
+            "*dotenv_path (string): path to .env file*",
         ]
     )

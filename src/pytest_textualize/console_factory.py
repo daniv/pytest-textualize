@@ -5,20 +5,18 @@ from __future__ import annotations
 
 import sys
 from io import StringIO
-from typing import Any
-from typing import IO
 from typing import TYPE_CHECKING
-from typing import TextIO
 
 import pytest
+from rich.console import Console
 
 from pytest_textualize.plugins.pytest_richtrace import console_key
 from pytest_textualize.plugins.pytest_richtrace import error_console_key
-from rich.console import Console
 
 if TYPE_CHECKING:
     from pytest_textualize.settings import ConsoleSettings
     from pytest_textualize import TextualizeSettings
+    from pathlib import Path
 
 
 class ConsoleFactory:
@@ -51,7 +49,9 @@ class ConsoleFactory:
 
             from rich.console import Console
 
-            error_console = Console(stderr=True, style="red", force_interactive=False, **exclude_none)
+            error_console = Console(
+                stderr=True, style="red", force_interactive=False, **exclude_none
+            )
             config.stash.setdefault(error_console_key, error_console)
 
         return error_console
@@ -81,3 +81,25 @@ class ConsoleFactory:
         console_settings = ConsoleFactory.check_settings(config)
         exclude_none = console_settings.model_dump(exclude_none=True)
         return Console(file=StringIO(), stderr=False, **exclude_none)
+
+
+def push_theme(rootpath: Path, console: Console, settings: TextualizeSettings) -> None:
+    from pydantic import TypeAdapter
+    from pydantic import FilePath
+
+    from rich.theme import Theme
+
+    if console.color_system == "truecolor":
+        path = settings.style_files.get("truecolor")
+    elif console.color_system == "falsecolor":
+        path = settings.style_files.get("standard")
+    else:
+        path = settings.style_files.get("eight_bit")
+
+    from rich_argparse_plus.themes import ARGPARSE_COLOR_THEMES
+
+    argparse_theme = Theme(ARGPARSE_COLOR_THEMES.get("mother_earth"), inherit=False)
+    filepath = TypeAdapter(FilePath).validate_python(rootpath / path)
+    theme = Theme.read(str(filepath))
+    theme.styles.update(argparse_theme.styles)
+    console.push_theme(theme, inherit=False)

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import sys
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
 from pytest_textualize.plugins.pytest_richtrace import console_key
 from pytest_textualize.plugins.pytest_richtrace import error_console_key
 from pytest_textualize.settings import settings_key
-import pytest_textualize._lazy_rich as r
-from unittest.mock import patch
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -23,6 +22,7 @@ pytest_plugins = "pytester"
 @pytest.hookimpl
 def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:
     from pytest_textualize.plugins.pytest_richtrace import plugin
+
     pluginmanager.register(plugin, plugin.PLUGIN_NAME)
 
 
@@ -55,9 +55,7 @@ class TextualizePytester:
         self.pytester = pytester
 
     def run_pytest(self, *args, **kwargs) -> pytest.RunResult:
-        result = self.pytester.runpytest(
-            '--textualize', str(self.pytester.path), *args, **kwargs
-        )
+        result = self.pytester.runpytest("--textualize", str(self.pytester.path), *args, **kwargs)
         return result
 
     def make_pyfile(self, *args, **kwargs) -> Path:
@@ -104,11 +102,18 @@ def textualize(pytestconfig: pytest.Config) -> bool:
 
 @pytest.fixture(name="console", autouse=False, scope="session")
 def create_output_console(pytestconfig: pytest.Config) -> Console | None:
+    from rich.console import Console
+
     if pytestconfig.option.console_print:
-        args = dict(color_system="truecolor", force_terminal=True, force_interactive=True, legacy_windows=False)
+        args = dict(
+            color_system="truecolor",
+            force_terminal=True,
+            force_interactive=True,
+            legacy_windows=False,
+        )
         if not sys.stdout.isatty():
             args["_environ"] = {"COLUMNS": "190", "TERM": "xterm-256color"}
-        console = r.Console(**args)
+        console = Console(**args)
         yield console
         del console
     else:

@@ -7,33 +7,29 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 from typing import Self
-from typing import TYPE_CHECKING
 from typing import Sized
+from typing import TYPE_CHECKING
 from typing import Type
 from typing import TypeVar
+
 import pytest
 from attr import dataclass
-from hamcrest import instance_of
-from pygments import highlight
-from pytest import param
-from pytest import mark
 from hamcrest import assert_that
-from hamcrest import equal_to, none, contains_string
+from hamcrest import equal_to
+from hamcrest import none
+from rich.color import Color
 from rich.console import HighlighterType
 from rich.console import RenderResult
-
-from rich.highlighter import ReprHighlighter
 from rich.style import Style
 from rich.text import Text
 from rich.text import TextType
 from rich.theme import Theme
-from rich.color import Color
 from rich.traceback import PathHighlighter
 
 from rich_tests import LOREM_SHORT
 
 if TYPE_CHECKING:
-    from rich.console import Console, ConsoleOptions, ConsoleRenderable
+    from rich.console import Console, ConsoleOptions
 
 parameterize = pytest.mark.parametrize
 SizedT = TypeVar("SizedT", bound=Sized)
@@ -93,7 +89,7 @@ class HookMessage:
             info: TextType | None = None,
             prefix: PrefixEnum = PrefixEnum.PREFIX_SQUARE,
             highlighter: HighlighterType | None = None,
-            escape: bool = False
+            escape: bool = False,
     ) -> None:
         self.hookname = hookname
         self.prefix = prefix
@@ -101,22 +97,20 @@ class HookMessage:
         self.highlighter = highlighter
         self.escape = escape
 
-        from rich.markup import escape, render
-
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        from rich.traceback import Traceback
 
         yield Text.assemble(
             (f"{self.prefix}", "pytest.prefix"),
             ("hook", "pytest.hook"),
             (": ", "pytest.colon"),
             (self.hookname.ljust(30), "pytest.hookname"),
-            end=" "
+            end=" ",
         )
         if self.info and isinstance(self.info, str):
             info = self.info
             if self.escape:
                 from rich.markup import escape
+
                 yield escape(info)
 
             elif self.highlighter:
@@ -241,34 +235,38 @@ def test_hook_msg_default_add_plain_info_str_with_markup(console: Console) -> No
 
 
 def test_styles_for_hook_message(console: Console) -> None:
-    theme_eight = Theme({
-        "args": Style(color=Color.from_ansi(230), bold=True, dim=True),
-        "text": Style(color=Color.from_ansi(231), dim=True),
-        "groups": Style(color=Color.from_ansi(231)),
-        "help": Style(color=Color.from_ansi(230), italic=True),
-        "metavar": Style(color=Color.from_ansi(184)),
-        "prog": Style(color=Color.from_ansi(208), bold=True),
-        "syntax": Style(color=Color.from_ansi(190), bold=True),
-        "add_enum": Style(color=Color.from_ansi(153), bold=False),
-        "help2": Style(color=Color.from_ansi(144)),
-        "groups2": Style(color=Color.from_ansi(138), dim=True),
-        "args2": Style(color=Color.from_ansi(153), bold=True),
-        "text2": Style(color=Color.from_ansi(144)),
-    })
-    theme_true = Theme({
-        "BLUE5": Style(color=Color.parse("#B3C8CF")),
-        "BLUE6": Style(color=Color.parse("#51829B")),
-        "BLUE7": Style(color=Color.parse("#F2F2F2")),
-        "BLUE8": Style(color=Color.parse("#C2D0E9")),
-        "BLUE9": Style(color=Color.parse("#91ACDF")),
-        "BLUE10": Style(color=Color.parse("#EEE9DA")),
-        "BLUE11": Style(color=Color.parse("#BDCDD6")),
-        "BLUE12": Style(color=Color.parse("#93BFCF")),
-        "BLUE13": Style(color=Color.parse("#6096B4")),
-        "BLUE13B": Style(color=Color.parse("#6096B4"), bold=True),
-        "BLUE13I": Style(color=Color.parse("#6096B4"), italic=True),
-        "BLUE13IB": Style(color=Color.parse("#6096B4"), italic=True, bold=True),
-    })
+    theme_eight = Theme(
+        {
+            "args": Style(color=Color.from_ansi(230), bold=True, dim=True),
+            "text": Style(color=Color.from_ansi(231), dim=True),
+            "groups": Style(color=Color.from_ansi(231)),
+            "help": Style(color=Color.from_ansi(230), italic=True),
+            "metavar": Style(color=Color.from_ansi(184)),
+            "prog": Style(color=Color.from_ansi(208), bold=True),
+            "syntax": Style(color=Color.from_ansi(190), bold=True),
+            "add_enum": Style(color=Color.from_ansi(153), bold=False),
+            "help2": Style(color=Color.from_ansi(144)),
+            "groups2": Style(color=Color.from_ansi(138), dim=True),
+            "args2": Style(color=Color.from_ansi(153), bold=True),
+            "text2": Style(color=Color.from_ansi(144)),
+        }
+    )
+    theme_true = Theme(
+        {
+            "BLUE5": Style(color=Color.parse("#B3C8CF")),
+            "BLUE6": Style(color=Color.parse("#51829B")),
+            "BLUE7": Style(color=Color.parse("#F2F2F2")),
+            "BLUE8": Style(color=Color.parse("#C2D0E9")),
+            "BLUE9": Style(color=Color.parse("#91ACDF")),
+            "BLUE10": Style(color=Color.parse("#EEE9DA")),
+            "BLUE11": Style(color=Color.parse("#BDCDD6")),
+            "BLUE12": Style(color=Color.parse("#93BFCF")),
+            "BLUE13": Style(color=Color.parse("#6096B4")),
+            "BLUE13B": Style(color=Color.parse("#6096B4"), bold=True),
+            "BLUE13I": Style(color=Color.parse("#6096B4"), italic=True),
+            "BLUE13IB": Style(color=Color.parse("#6096B4"), italic=True, bold=True),
+        }
+    )
     # with open("C:/Users/solma/PycharmProjects/pytest-textualize/static/styles/truecolor_styles.ini",
     #           "wt") as write_theme:
     #     write_theme.write(theme_true.config)
@@ -339,6 +337,8 @@ def test_styles_for_hook_message(console: Console) -> None:
 
 
 def test_load_from_file(console: Console):
-    load_theme = Theme.read("C:/Users/solma/PycharmProjects/pytest-textualize/static/styles/truecolor_styles.ini")
+    load_theme = Theme.read(
+        "C:/Users/solma/PycharmProjects/pytest-textualize/static/styles/truecolor_styles.ini"
+    )
 
     y = 0

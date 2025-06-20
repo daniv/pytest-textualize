@@ -1,13 +1,11 @@
 # Project : pytest-textualize
-# File Name : tests_textwrapp.py
+# File Name : tests_textwrap.py
 # Dir Path : tests/setup_tests
 
 from __future__ import annotations
 
 import textwrap
-from typing import Sized
 from typing import TYPE_CHECKING
-from typing import TypeVar
 
 import pytest
 
@@ -17,7 +15,6 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 parameterize = pytest.mark.parametrize
-SizedT = TypeVar("SizedT", bound=Sized)
 
 
 def test_textwrap_fill(console: Console) -> None:
@@ -28,7 +25,11 @@ def test_textwrap_fill(console: Console) -> None:
 
 
 def test_textwrap_fill_initial_indent(console: Console) -> None:
-    fill = textwrap.fill(LOREM_SHORT, width=15, initial_indent=" - ", )
+    fill = textwrap.fill(
+        LOREM_SHORT,
+        width=15,
+        initial_indent=" - ",
+    )
     if console:
         console.line(2)
         console.rule("w=15, initial_indent=' - '")
@@ -36,7 +37,11 @@ def test_textwrap_fill_initial_indent(console: Console) -> None:
 
 
 def test_textwrap_fill_subsequent_indent(console: Console) -> None:
-    fill = textwrap.fill(LOREM_SHORT, width=15, subsequent_indent=" - ", )
+    fill = textwrap.fill(
+        LOREM_SHORT,
+        width=15,
+        subsequent_indent=" - ",
+    )
     if console:
         console.line(2)
         console.rule("w=15, subsequent_indent=' - '")
@@ -52,7 +57,9 @@ def test_textwrap_fill_subsequent_and_initial(console: Console) -> None:
 
 
 def test_textwrap_fill_subsequent_and_initial_expand_tabs(console: Console) -> None:
-    fill = textwrap.fill(LOREM_SHORT, width=15, initial_indent=" - ", subsequent_indent="   * ", expand_tabs=False)
+    fill = textwrap.fill(
+        LOREM_SHORT, width=15, initial_indent=" - ", subsequent_indent="   * ", expand_tabs=False
+    )
     if console:
         console.line(2)
         console.rule("w=15, initial_indent=' - ', subsequent_indent='   * ")
@@ -65,10 +72,10 @@ def test_textwrap_shorten() -> None:
 
 def test_textwrap_dedent(console: Console) -> None:
     # end first line with \ to avoid the empty line!
-    s = '''\
+    s = """\
       hello
         world
-      '''
+      """
     if console:
         console.line(2)
         console.rule("no dedent")

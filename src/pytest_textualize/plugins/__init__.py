@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pytest_textualize.plugins.pytest_richtrace.richtrace.model import TestRunResults
+from pytest_textualize.textualize.hook_message import HookMessage
 
 if TYPE_CHECKING:
     PytestPlugin = object
 
-__all__ = ["PytestPlugin", "cleanup_factory", "NotTest", "TestRunResults"]
+__all__ = ["PytestPlugin", "cleanup_factory", "NotTest", "TestRunResults", "HookMessage"]
 
 
 def cleanup_factory(pluginmanager: pytest.PytestPluginManager, plugin: PytestPlugin):
@@ -20,6 +21,7 @@ def cleanup_factory(pluginmanager: pytest.PytestPluginManager, plugin: PytestPlu
         name = pluginmanager.get_name(plugin)
         # TODO: log message
         pluginmanager.unregister(name=name)
+        pluginmanager.hook.pytest_plugin_unregistered(plugin=plugin)
 
     return clean_up
 
