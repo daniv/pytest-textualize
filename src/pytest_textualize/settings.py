@@ -13,11 +13,18 @@ from typing import Any
 from typing import Literal
 from typing import TYPE_CHECKING
 
+import dotenv
 import pytest
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import PrivateAttr
+from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings
+from pydantic_settings import DotEnvSettingsSource
+from pydantic_settings import InitSettingsSource
+from pydantic_settings import PydanticBaseSettingsSource
+from pydantic_settings import PyprojectTomlConfigSettingsSource
 from pydantic_settings import SettingsConfigDict
 from rich.syntax import ANSISyntaxTheme
 from rich.syntax import SyntaxTheme
@@ -66,21 +73,23 @@ class Verbosity(IntEnum):
     DEBUG = 3  # -vvv
 
 
-class DotEnvSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        title="Pytest-Textualize DotEnv Settings Source",
-        env_file=locate(".env", Path.cwd()),
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        env_ignore_empty=False,
-        env_nested_delimiter="--",
-        env_parse_none_str="None",
-        env_parse_enums=False,
-    )
-    py_colors: int
+# class DotEnvSettings(BaseSettings):
+#     model_config = SettingsConfigDict(
+#         title="Pytest-Textualize DotEnv Settings Source",
+#         env_file=locate(".env", Path.cwd()),
+#         env_file_encoding="utf-8",
+#         case_sensitive=False,
+#         env_ignore_empty=False,
+#         env_nested_delimiter="--",
+#         env_parse_none_str="None",
+#         env_parse_enums=False,
+#     )
+#     env_parse_none_str = "None"
+#     py_colors: int
+#     console_outputs: bool = True
 
 
-class ConsolePyProjectSettings(BaseModel):
+class ConsolePyProjectSettingsModel(BaseModel):
     model_config = ConfigDict(
         title="Console Settings", validate_default=True, validate_assignment=True
     )
@@ -89,59 +98,61 @@ class ConsolePyProjectSettings(BaseModel):
         description="he color system supported by your terminal, 'standard', '256' or 'truecolor'. Leave as 'auto' to autodetect.",
     )
     force_terminal: bool | None = Field(
-        None,
+        default=None,
         description="Enable/disable terminal control codes, or None to auto-detect terminal, default to None",
     )
     force_jupyter: bool | None = Field(
-        None,
+        default=None,
         description="Enable/disable Jupyter rendering, or None to auto-detect Jupyter. Defaults to None.",
     )
     force_interactive: bool | None = Field(
-        None,
+        default=None,
         description="Enable/disable interactive mode, or None to auto detect. Defaults to None.",
     )
     soft_wrap: bool = Field(
-        False, description="Set soft wrap default on print method. Defaults to False."
+        default=False, description="Set soft wrap default on print method. Defaults to False."
     )
     no_color: bool | None = Field(
-        None, description="Enabled no color mode, or None to auto detect. Defaults to None."
+        default=None, description="Enabled no color mode, or None to auto detect. Defaults to None."
     )
     tab_size: int = Field(
-        8, ge=4, description="Number of spaces used to replace a tab character. Defaults to 8."
+        default=8, ge=4, description="Number of spaces used to replace a tab character. Defaults to 8."
     )
     markup: bool = Field(True, description="Enable/disable markup mode. Defaults to True.")
     emoji: bool = Field(True, description="Enable/disable emoji mode. Defaults to True.")
     emoji_variant: EmojiVariant | None = Field(
-        None, description="Optional emoji variant, either 'text' or 'emoji'. Defaults to None."
+        default=None, description="Optional emoji variant, either 'text' or 'emoji'. Defaults to None."
     )
     highlight: bool = Field(
-        True, description="Enable/disable automatic highlight mode. Defaults to True."
+        default=True, description="Enable/disable automatic highlight mode. Defaults to True."
     )
     log_time: bool = Field(
-        True,
+        default=True,
         description="Boolean to enable logging of time by <method: log> methods. Defaults to True.",
     )
     log_path: bool = Field(
-        True, description="the logging of the caller by <method: log>. Defaults to True."
+        default=True, description="the logging of the caller by <method: log>. Defaults to True."
     )
     highlighter: str | None = Field(
-        None, description="Default highlighter is rich.highlighter.ReprHighlighter."
+        default=None, description="Default highlighter is rich.highlighter.ReprHighlighter."
     )
     theme: str | None = Field(
-        None, description=" An optional style theme object, or None for default theme."
+        default=None, description=" An optional style theme object, or None for default theme."
     )
     legacy_windows: bool | None = Field(
-        None, description="Enable legacy Windows mode, or None to auto detect. Defaults to None"
+        default=None, description="Enable legacy Windows mode, or None to auto detect. Defaults to None"
     )
     safe_box: bool | None = Field(
-        None, description="Restrict box options that don't render on legacy Windows."
+        default=None, description="Restrict box options that don't render on legacy Windows."
     )
 
-    argparse_theme: str = Field("mother_earth")
+    @property
+    def argparse_theme(self) -> str :
+        return "mother_earth"
 
     @property
-    def terminal_size_fallback(self) -> dict[str, str]:
-        return {"COLUMNS": "190", "LINES": "25"}
+    def environ(self) -> Mapping[str, str] :
+        return {"COLUMNS": "200", "LINES": "25"}
 
     def get_theme(self, color_system: ColorSystemVariant) -> Theme:
         from pydantic import TypeAdapter
@@ -166,52 +177,46 @@ class ConsolePyProjectSettings(BaseModel):
         return theme
 
     def model_post_init(self, context: Any, /) -> None:
-        from pydantic_settings import PyprojectTomlConfigSettingsSource
-
-        class Settings(BaseSettings):
-            model_config = SettingsConfigDict(
-                pyproject_toml_table_header=("tool", "textualize-settings", "console"),
-                pyproject_toml_depth=4
-            )
-
-        s = PyprojectTomlConfigSettingsSource(Settings)
-        for k, v in s.toml_data.items():
-            setattr(self, k, v)
-
-
-class PyprojectModel(BaseModel):
-    path: Path | None = None
-    data: dict[str, Any] = Field(default_factory=dict)
-
-    def model_post_init(self, context: Any, /) -> None:
-        from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource
-
-        class Settings(BaseSettings):
-            model_config = SettingsConfigDict(toml_file=locate("pyproject.toml"))
-
-        toml = TomlConfigSettingsSource(Settings)
-        self.data = toml.toml_data
-        self.path = Path(toml.toml_file_path).resolve()
+        pass
+        # from pydantic_settings import PyprojectTomlConfigSettingsSource
+        #
+        # class Settings(BaseSettings):
+        #     model_config = SettingsConfigDict(
+        #         pyproject_toml_table_header=("tool", "textualize-settings", "console"),
+        #         pyproject_toml_depth=4
+        #     )
+        #
+        # s = PyprojectTomlConfigSettingsSource(Settings)
+        # for k, v in s.toml_data.items():
+        #     setattr(self, k, v)
 
 
-class _Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        pyproject_toml_table_header=("tool", "textualize-settings", "logging"),
-        pyproject_toml_depth=4
-    )
+# class PyprojectModel(BaseModel):
+#     path: Path | None = None
+#     data: dict[str, Any] = Field(default_factory=dict)
+#
+#     def model_post_init(self, context: Any, /) -> None:
+#         from pydantic_settings import BaseSettings, SettingsConfigDict, TomlConfigSettingsSource
+#
+#         class Settings(BaseSettings):
+#             model_config = SettingsConfigDict(toml_file=locate("pyproject.toml"))
+#
+#         toml = TomlConfigSettingsSource(Settings)
+#         self.data = toml.toml_data
+#         self.path = Path(toml.toml_file_path).resolve()
 
 
 class _TracebacksAbstractModel(BaseModel, ABC):
     locals_max_string: int = Field(
-        80, description="Maximum length of string before truncating.", ge=20
+        default=80, description="Maximum length of string before truncating.", ge=20
     )
 
     locals_max_length: int = Field(
-        10, description="Maximum length of containers before abbreviating.", ge=1, le=20
+        default=10, description="Maximum length of containers before abbreviating.", ge=1, le=20
     )
 
 
-class TracebacksPyProjectSettings(_TracebacksAbstractModel):
+class TracebacksPyProjectSettingsModel(_TracebacksAbstractModel):
     model_config = ConfigDict(
         title="Tracebacks Configuration Settings",
         arbitrary_types_allowed=True,
@@ -219,57 +224,64 @@ class TracebacksPyProjectSettings(_TracebacksAbstractModel):
         validate_assignment=True,
         extra="forbid",
     )
-    width: int = Field(100, description="Number of characters used to traceback. Defaults to 100.")
+    width: int = Field(default=100, description="Number of characters used to traceback. Defaults to 100.")
     code_width: int = Field(
-        88, description="Number of code characters used to render tracebacks.", gt=80
+        default=88, description="Number of code characters used to render tracebacks.", gt=80
     )
-    extra_lines: int = Field(3, description="Additional lines of code to render tracebacks.", ge=0)
+    extra_lines: int = Field(default=3, description="Additional lines of code to render tracebacks.", ge=0)
     theme: str = Field(
         "ansi_dark",
         alias="theme",
         title="Tracebacks Theme",
         description="Override pygments theme used in traceback.",
     )
-    word_wrap: bool = Field(True, description="Enable word wrapping of long tracebacks lines.")
-    show_locals: bool = Field(False, description="Enable display of locals in tracebacks.")
+    word_wrap: bool = Field(default=True, description="Enable word wrapping of long tracebacks lines.")
+    show_locals: bool = Field(default=False, description="Enable display of locals in tracebacks.")
     locals_hide_dunder: bool = Field(
-        True, description="Hide locals prefixed with double underscore."
+        default=True, description="Hide locals prefixed with double underscore."
     )
     locals_hide_sunder: bool = Field(
-        False, description="Hide locals prefixed with single underscore."
+        default=False, description="Hide locals prefixed with single underscore."
     )
     indent_guides: bool = Field(True, description="Enable indent guides in code and locals.")
     suppress: Iterable[str] = (
         Field((), description="Optional sequence of modules or paths to exclude from traceback."),
     )
     max_frames: int = Field(
-        100, title="Max Frames", description="Maximum number of frames returned by traceback.", ge=1
+        default=100, title="Max Frames", description="Maximum number of frames returned by traceback.", ge=1
     )
 
-    syntax_theme: SyntaxTheme | None = None
+    _syntax_theme: SyntaxTheme | None = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
-        from pydantic_settings import PyprojectTomlConfigSettingsSource
-
-        class Settings(BaseSettings):
-            model_config = SettingsConfigDict(
-                pyproject_toml_table_header=("tool", "textualize-settings", "tracebacks"),
-                pyproject_toml_depth=4
-            )
-
-        s = PyprojectTomlConfigSettingsSource(Settings)
-        for k, v in s.toml_data.items():
-            setattr(self, k, v)
-
         if self.theme == "pycharm_dark":
             from pytest_textualize.textualize.theme.syntax import PYCHARM_DARK
-            self.syntax_theme = ANSISyntaxTheme(PYCHARM_DARK)
+            self._syntax_theme = ANSISyntaxTheme(PYCHARM_DARK)
         else:
             from rich.syntax import Syntax
-            self.syntax_theme = Syntax.get_theme(self.syntax_theme)
+            self._syntax_theme = Syntax.get_theme(self.syntax_theme)
+
+    #     from pydantic_settings import PyprojectTomlConfigSettingsSource
+    #
+    #     class Settings(BaseSettings):
+    #         model_config = SettingsConfigDict(
+    #             pyproject_toml_table_header=("tool", "textualize-settings", "tracebacks"),
+    #             pyproject_toml_depth=4
+    #         )
+    #
+    #     s = PyprojectTomlConfigSettingsSource(Settings)
+    #     for k, v in s.toml_data.items():
+    #         setattr(self, k, v)
+    #
+    #     if self.theme == "pycharm_dark":
+    #         from pytest_textualize.textualize.theme.syntax import PYCHARM_DARK
+    #         self.syntax_theme = ANSISyntaxTheme(PYCHARM_DARK)
+    #     else:
+    #         from rich.syntax import Syntax
+    #         self.syntax_theme = Syntax.get_theme(self.syntax_theme)
 
 
-class LoggingPyProjectSettings(_TracebacksAbstractModel):
+class LoggingPyProjectSettingsModel(_TracebacksAbstractModel):
     model_config = ConfigDict(
         title="Logging Configuration Settings",
         validate_default=True,
@@ -320,8 +332,7 @@ class LoggingPyProjectSettings(_TracebacksAbstractModel):
     )
 
     tracebacks_theme: str = Field(
-        "ansi_dark",
-        alias="theme",
+        default="ansi_dark",
         title="Tracebacks Theme",
         description="Override pygments theme used in traceback.",
     )
@@ -351,46 +362,85 @@ class LoggingPyProjectSettings(_TracebacksAbstractModel):
         [], description="List of words to highlight instead of ``RichHandler.KEYWORDS``."
     )
 
-    def model_post_init(self, context: Any, /) -> None:
-        from pydantic_settings import PyprojectTomlConfigSettingsSource
-
-        class Settings(BaseSettings):
-            model_config = SettingsConfigDict(
-                pyproject_toml_table_header=("tool", "textualize-settings", "logging"),
-                pyproject_toml_depth=4
-            )
-
-        s = PyprojectTomlConfigSettingsSource(Settings)
-        for k, v in s.toml_data.items():
-            setattr(self, k, v)
+    # def model_post_init(self, context: Any, /) -> None:
+    #     from pydantic_settings import PyprojectTomlConfigSettingsSource
+    #
+    #     class Settings(BaseSettings):
+    #         model_config = SettingsConfigDict(
+    #             pyproject_toml_table_header=("tool", "textualize-settings", "logging"),
+    #             pyproject_toml_depth=4
+    #         )
+    #
+    #     s = PyprojectTomlConfigSettingsSource(Settings)
+    #     for k, v in s.toml_data.items():
+    #         setattr(self, k, v)
 
 
 class TextualizeSettings(BaseSettings):
-    model_config = SettingsConfigDict(title="Pytest Textualize Settings")
-    env: DotEnvSettings = Field(default_factory=DotEnvSettings)
-    pyproject: PyprojectModel = Field(default_factory=PyprojectModel)
-    tracebacks_settings: TracebacksPyProjectSettings | None = Field(
-        default_factory=TracebacksPyProjectSettings,
-        description="The rich tracebacks settings",
+    model_config = SettingsConfigDict(
+        title="Pytest Textualize Settings",
+        pyproject_toml_depth=3,
+
+        pyproject_toml_table_header=('tool', 'textualize-settings'),
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_ignore_empty=True,
+        case_sensitive=False,
+        env_parse_none_str="None",
+        extra="forbid"
     )
-    logging_settings: LoggingPyProjectSettings = Field(
-        default_factory=LoggingPyProjectSettings,
-        description="The rich logging settings",
-    )
-    console_settings: ConsolePyProjectSettings = Field(default_factory=ConsolePyProjectSettings)
-    verbosity: Verbosity = Field(Verbosity.NORMAL)
-    log_format: str | None = Field("%(message)s", description="The logging.formatter template")
-    pytest_config: pytest.Config
+
+    py_colors: int | None = Field(default=0, alias="PY_COLORS")
+    console_outputs: bool | None = Field(default=False, alias="CONSOLE_OUTPUTS")
+    tracebacks: Mapping[str, Any] = Field(default_factory=dict)
+    logging: LoggingPyProjectSettingsModel = Field(default_factory=LoggingPyProjectSettingsModel)
+    console: Mapping[str, Any] = Field(default_factory=dict)
+
+    # env: DotEnvSettings = Field(default_factory=DotEnvSettings)
+    #pyproject: PyprojectModel = Field(default_factory=PyprojectModel)
+    # toml_data: dict[str, Any] | None = Field(default_factory=dict)
+    # toml_file_path: Path | None = None
+    # tracebacks: TracebacksPyProjectSettings = Field(default_factory=TracebacksPyProjectSettings)
+    #         self.path = Path(toml.toml_file_path).resolve()
+    # tracebacks_settings: TracebacksPyProjectSettings | None = Field(
+    #     default_factory=TracebacksPyProjectSettings,
+    #     description="The rich tracebacks settings",
+    # )
+    # logging_settings: LoggingPyProjectSettings = Field(
+    #     default_factory=LoggingPyProjectSettings,
+    #     description="The rich logging settings",
+    # )
+    # console_settings: ConsolePyProjectSettings = Field(default_factory=ConsolePyProjectSettings)
+    verbosity: Verbosity = Field(default=Verbosity.NORMAL)
+    log_format: str | None = Field(default="%(message)s", description="The logging.formatter template")
+    pytestconfig: pytest.Config
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> Any:
+        pass
+
+    @classmethod
+    def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: DotEnvSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return env_settings, init_settings, PyprojectTomlConfigSettingsSource(settings_cls)
 
     def model_post_init(self, context: Any, /) -> None:
+        from dotenv import load_dotenv, find_dotenv
+
+        file = find_dotenv(".env", raise_error_if_not_found=True)
+        load_dotenv(file, verbose=True)
         from _pytest.logging import get_option_ini
 
-        self.verbosity = self.pytest_config.getoption("--verbose")
-        self.log_format = get_option_ini(self.pytest_config, "log_file_format", "log_format")
-        self.logging_settings.level = get_option_ini(self.pytest_config, "log_level")
-        self.logging_settings.tracebacks_show_locals = self.pytest_config.getoption("--showlocals")
-        self.logging_settings.log_time_format = get_option_ini(self.pytest_config, "log_date_format")
-        self.tracebacks_settings.show_locals = self.pytest_config.getoption("--showlocals")
+
+        # self.logging_settings.level = get_option_ini(self.pytest_config, "log_level")
+        # self.logging_settings.tracebacks_show_locals = self.pytest_config.getoption("--showlocals")
+        # self.logging_settings.log_time_format = get_option_ini(self.pytest_config, "log_date_format")
+        # self.tracebacks_settings.show_locals = self.pytest_config.getoption("--showlocals")
         # "dotenv_path"
 
 
