@@ -69,3 +69,34 @@ def configure_logging(console: Console, txt_settings: TextualizeSettings) -> Non
         handlers=[rich_handler],
     )
     logging.captureWarnings(True)
+
+def console_factory(config: pytest.Config, instance: Literal["stdout", "stderr", "buffer", "null"]) -> Console:
+    from pytest_textualize.console_factory import ConsoleFactory
+
+    match instance:
+        case "stdout":
+            return ConsoleFactory.console_stdout(config)
+        case "stderr":
+            return ConsoleFactory.console_stderr(config)
+        case "buffer":
+            return ConsoleFactory.console_buffer(config)
+        case "null":
+            return ConsoleFactory.console_null(config)
+        case _:
+            assert_never(instance)
+
+def tracer_message(
+    hookname: str,
+    *,
+    console: Console | None = None,
+    prefix: PrefixEnum = PrefixEnum.PREFIX_SQUARE,
+    info: TextType | None = None,
+    escape: bool = False,
+    highlight: bool = False,
+) -> TracerMessage:
+
+    from pytest_textualize.textualize.console import TracerMessage
+    trm = TracerMessage(hookname, prefix=prefix, info=info, highlight=highlight, escape=escape)
+    if console is not None:
+        trm(console)
+    return trm
