@@ -25,7 +25,9 @@ if TYPE_CHECKING:
 
 
 class TextualizeConsoleHandler(RichHandler):
-    def __init__(self, level: int | str = logging.NOTSET, console: Console | None = None, **kwargs) -> None:
+    def __init__(
+        self, level: int | str = logging.NOTSET, console: Console | None = None, **kwargs
+    ) -> None:
         super().__init__(level, console, **kwargs)
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -83,15 +85,15 @@ class TextualizeConsoleHandler(RichHandler):
 class TextualizeConsoleLogRender(LogRender):
 
     def __call__(
-            self,
-            console: Console,
-            renderables: Iterable[ConsoleRenderable],
-            log_time: datetime | None = None,
-            time_format: str | FormatTimeCallable | None = None,
-            level: TextType = "",
-            path: str | None = None,
-            line_no: int | None = None,
-            link_path: str | None = None,
+        self,
+        console: Console,
+        renderables: Iterable[ConsoleRenderable],
+        log_time: datetime | None = None,
+        time_format: str | FormatTimeCallable | None = None,
+        level: TextType = "",
+        path: str | None = None,
+        line_no: int | None = None,
+        link_path: str | None = None,
     ) -> Table:
         from rich.containers import Renderables
         from rich.table import Table
@@ -122,23 +124,31 @@ class TextualizeConsoleLogRender(LogRender):
             row.append(level)
 
         row.append(Renderables(renderables))
-
-        if link_path:
-            link_path = Path(link_path).as_posix()
-
         if self.show_path and path:
-            path_text = f"link file://{link_path}" if link_path else ""
+            link_path = Path(link_path).as_posix()
+            path_text = Text()
             if sys.stdout.isatty():
-                path_text = path
-            if line_no:
-                link = f"{path}:{line_no}"
-                if sys.stdout.isatty():
-                    link = f"[link={link_path}:{line_no}]{path}:{line_no}[/link]"
-                path_text = (
-                    link
-                    if link_path
-                    else f"{path}:{line_no}"
-                )
-            row.append(Text.from_markup(path_text, style="blue"))
+                if link_path:
+                    markup = Text.from_markup(f"[link={link_path}][bright_blue]{path}[/][/link]")
+                    path_text.append_text(markup)
+                else:
+                    path_text.append(path)
+                if line_no:
+                    if link_path:
+                        path_text = Text()
+                        markup = Text.from_markup(
+                            f"[link={link_path}:{line_no}][bright_blue]{path}:{line_no}[/][/link]"
+                        )
+                        path_text.append_text(markup)
+                    else:
+                        path_text.append(f":{line_no}", style="bright_blue")
+            else:
+                if line_no:
+                    path_text.append(f"{path}:{line_no}", style="bright_blue")
+                else:
+                    path_text.append(path, style="bright_blue")
+
+            row.append(path_text)
+
         output.add_row(*row)
         return output

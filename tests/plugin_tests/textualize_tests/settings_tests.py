@@ -6,122 +6,141 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
 from typing import TYPE_CHECKING
 from unittest import mock
 
 import pytest
+from glom import glom
 from hamcrest import assert_that
 from hamcrest import equal_to
-from hamcrest import has_key
-from hamcrest import has_length
-from hamcrest import not_
-from pydantic import BaseModel
-from pydantic import ValidationError
-from pydantic_settings import BaseSettings
-from pydantic_settings import PydanticBaseSettingsSource
-from pydantic_settings import PyprojectTomlConfigSettingsSource
-from pydantic_settings import SettingsConfigDict
-from rich.traceback import Traceback
+from hamcrest import greater_than
+from hamcrest import none
 
 from pytest_textualize import TextualizeSettings
+from pytest_textualize import get_bool_opt
+from pytest_textualize.helpers import SetEnv
+from pytest_textualize.helpers import get_int_opt
 from pytest_textualize.textualize import locate
 
 if TYPE_CHECKING:
+    pass
     from collections.abc import Generator
-    from tests.helpers.env import SetEnv
-    from rich.console import Console
 
 parameterize = pytest.mark.parametrize
 
 
-class SimpleSettings(BaseSettings):
-    model_config = SettingsConfigDict(
-        pyproject_toml_depth=3,
-        pyproject_toml_table_header=('tool', 'textualize-settings', "logging")
-    )
+@pytest.fixture(autouse=False, scope="module")
+def clean_environment() -> Generator[None, None, None]:
+    """Cleans the environment variables"""
+    with mock.patch.dict(os.environ, clear=True):
+        yield
+
+def test__init__model_config(pytestconfig: pytest.Config) -> None:
+    settings = TextualizeSettings(pytestconfig=pytestconfig)
+
+    assert_that(settings.model_config.get("extra"), equal_to("forbid"), reason="extra")
+    assert_that(settings.model_config.get("validate_default"), equal_to(True), reason="validate_default")
+    assert_that(settings.model_config.get("case_sensitive"), equal_to(False), reason="case_sensitive")
+    assert_that(settings.model_config.get("env_file"), equal_to(".env"), reason="env_file")
+    assert_that(settings.model_config.get("env_file"), equal_to(".env"), reason="env_file")
+    assert_that(settings.model_config.get("env_file_encoding"), equal_to("utf-8"), reason="env_file_encoding")
+    assert_that(settings.model_config.get("env_ignore_empty"), equal_to(True), reason="env_ignore_empty")
+    assert_that(settings.model_config.get("env_parse_none_str"), equal_to("None"), reason="env_parse_none_str")
+    assert_that(settings.model_config.get("title"), equal_to('Pytest Textualize Settings'), reason="title")
+    assert_that(settings.model_config.get('pyproject_toml_table_header'), equal_to(('tool', 'textualize-settings')), reason="pyproject_toml_table_header")
+    assert_that(settings.model_config.get('pyproject_toml_depth'), greater_than(1), reason="pyproject_toml_depth")
 
 
-def test___init__(pytestconfig: pytest.Config) -> None:
-    obj = PyprojectTomlConfigSettingsSource(SimpleSettings)
-    assert_that(obj.toml_table_header, equal_to(('tool', 'textualize-settings', "logging")), reason="toml_table_header")
-    assert_that(obj.toml_data, has_key('tracebacks_theme'), reason="tracebacks_theme")
-    assert_that(obj.toml_file_path, equal_to(pytestconfig.rootpath / "pyproject.toml"), reason="tracebacks_theme")
+def test__init__dot_env(pytestconfig: pytest.Config) -> None:
+    expected_py_colors = get_int_opt("py_colors", os.getenv("PY_COLORS"))
+    expected_console_outputs = get_bool_opt("console_outputs", os.getenv("CONSOLE_OUTPUTS"))
+
+    settings = TextualizeSettings(pytestconfig=pytestconfig)
+    assert_that(glom(settings.model_fields, "py_colors.default"), equal_to(0), reason="default py_colors")
+    assert_that(glom(settings.model_fields, "console_outputs.default"), equal_to(False), reason="default console_outputs")
+    assert_that(settings.py_colors, equal_to(expected_py_colors), reason="PY_COLORS")
+    assert_that(settings.console_outputs, equal_to(expected_console_outputs), reason="CONSOLE_OUTPUTS")
 
 
-def test_pyproject_toml_file_explicit() -> None:
-    pyproject = Path.cwd().parent / "pyproject.toml"
-    pass
+def test_logging_model_defaults(pytestconfig: pytest.Config) -> None:
+    settings = TextualizeSettings(pytestconfig=pytestconfig)
+    logging = settings.model_fields["logging"]
 
-    class Nested(BaseModel):
-        rich_tracebacks: bool
-        tracebacks_theme: str
+    field_info = settings.get_field_value(logging, "level")
+    assert_that(field_info.default, equal_to(0), reason="default level")
 
-    class Settings(BaseSettings):
-        logging: Nested
-        model_config = SettingsConfigDict(pyproject_toml_table_header=('tool', 'textualize-settings'))
+    field_info = settings.get_field_value(logging, "enable_link_path")
+    assert_that(field_info.default, equal_to(True), reason="default enable_link_path")
 
-        @classmethod
-        def settings_customise_sources(
-                cls, settings_cls: type[BaseSettings], **_kwargs: PydanticBaseSettingsSource
-        ) -> tuple[PydanticBaseSettingsSource, ...]:
-            return (PyprojectTomlConfigSettingsSource(settings_cls, pyproject),)
+    field_info = settings.get_field_value(logging, "highlighter")
+    assert_that(field_info.default, none(), reason="default enable_link_path")
 
-    s = Settings()
-    assert_that(s.logging.rich_tracebacks, equal_to(True), reason="rich_tracebacks")
+    field_info = settings.get_field_value(logging, "markup")
+    assert_that(field_info.default, equal_to(False), reason="default markup")
+
+    field_info = settings.get_field_value(logging, "locals_max_length")
+    assert_that(field_info.default, equal_to(10), reason="default locals_max_length")
 
 
-class LoggingOptions(BaseModel):
-    tracebacks_theme: str
+def test_tracebacks_model_defaults(pytestconfig: pytest.Config) -> None:
+    settings = TextualizeSettings(pytestconfig=pytestconfig)
+    tracebacks = settings.model_fields["tracebacks"]
+
+    field_info = settings.get_field_value(tracebacks, "code_width")
+    assert_that(field_info.default, equal_to(88), reason="default code_width")
+
+    field_info = settings.get_field_value(tracebacks, "extra_lines")
+    assert_that(field_info.default, equal_to(3), reason="default extra_lines")
+
+    field_info = settings.get_field_value(tracebacks, "max_frames")
+    assert_that(field_info.default, equal_to(100), reason="default max_frames")
+
+    field_info = settings.get_field_value(tracebacks, "show_locals")
+    assert_that(field_info.default, equal_to(False), reason="default show_locals")
+
+    field_info = settings.get_field_value(tracebacks, "word_wrap")
+    assert_that(field_info.default, equal_to(True), reason="default word_wrap")
 
 
-def test_pyproject_toml_file_extra_forbid() -> None:
-    class Settings(BaseSettings):
-        logging: LoggingOptions
-        model_config = SettingsConfigDict(pyproject_toml_table_header=('tool', 'textualize-settings'), extra="forbid")
+@pytest.mark.usefixtures("clean_environment")
+@parameterize("py_colors, console_outputs", [(0, True), (1, False)])
+def test_changing_env_values(
+        pytestconfig: pytest.Config,
+        env: SetEnv, py_colors: int, console_outputs: bool
+) -> None:
+    assert "PY_COLORS" not in os.environ
+    assert "CONSOLE_OUTPUTS" not in os.environ
+    env.set("PY_COLORS", str(py_colors))
+    env.set("CONSOLE_OUTPUTS", str(console_outputs))
+    assert "PY_COLORS" in os.environ
+    assert "CONSOLE_OUTPUTS" in os.environ
 
-        @classmethod
-        def settings_customise_sources(
-                cls, settings_cls: type[BaseSettings], **_kwargs: PydanticBaseSettingsSource
-        ) -> tuple[PydanticBaseSettingsSource, ...]:
-            return (PyprojectTomlConfigSettingsSource(settings_cls, Path.cwd().parent / "pyproject.toml"),)
+    # noinspection PyArgumentList
+    settings = TextualizeSettings(pytestconfig=pytestconfig)
+    assert_that(settings.py_colors, equal_to(py_colors), reason="PY_COLORS")
+    assert_that(settings.console_outputs, equal_to(console_outputs), reason="CONSOLE_OUTPUTS")
 
-    s = Settings()
-    assert_that(s.logging.tracebacks_theme, equal_to("pycharm_dark"), reason="tracebacks_theme")
+@pytest.mark.usefixtures("clean_environment")
+@pytest.mark.xfail(raises=AssertionError, reason="not updated atef changing environment")
+def test_changing_env_values_after__init(
+        pytestconfig: pytest.Config, env: SetEnv
+) -> None:
+    settings = TextualizeSettings(pytestconfig=pytestconfig)
 
-    with pytest.raises(AttributeError):
-        assert_that(s.logging.rich_tracebacks, equal_to(True), reason="rich_tracebacks")
+    default_py_color = glom(settings.model_fields, "py_colors.default")
+    default_console_outputs = glom(settings.model_fields, "console_outputs.default")
+    assert_that(settings.py_colors, equal_to(default_py_color), reason="PY_COLORS default")
+    assert_that(settings.console_outputs, equal_to(default_console_outputs), reason="CONSOLE_OUTPUTS")
 
+    new_py_color = 1 if default_py_color == 0 else 1
+    new_console_outputs = not default_console_outputs
+    env.set("PY_COLORS", str(new_py_color))
+    env.set("CONSOLE_OUTPUTS", str(new_console_outputs))
 
-def test_pyproject_toml_file_extra_allow() -> None:
-    class Settings(BaseSettings):
-        logging: LoggingOptions
-        model_config = SettingsConfigDict(pyproject_toml_table_header=('tool', 'textualize-settings'), extra="allow")
-
-        @classmethod
-        def settings_customise_sources(
-                cls, settings_cls: type[BaseSettings], **_kwargs: PydanticBaseSettingsSource
-        ) -> tuple[PydanticBaseSettingsSource, ...]:
-            return (PyprojectTomlConfigSettingsSource(settings_cls, Path.cwd().parent / "pyproject.toml"),)
-
-    s = Settings()
-    assert_that(s.logging.tracebacks_theme, equal_to("pycharm_dark"), reason="tracebacks_theme")
-    with pytest.raises(AttributeError):
-        assert_that(s.logging.rich_tracebacks, equal_to(True), reason="rich_tracebacks")
+    assert_that(settings.py_colors, equal_to(new_py_color), reason="new value PY_COLORS")
+    assert_that(settings.console_outputs, equal_to(new_console_outputs), reason="new value CONSOLE_OUTPUTS")
 
 
-# class NoPostInitConsoleSettings(ConsoleSettings):
-#     def model_post_init(self, context: Any, /) -> None:
-#         pass
-#
-#
-# @pytest.fixture(autouse=True, scope="function")
-# def clean_environment() -> Generator[None, None, None]:
-#     """Cleans the environment variables after each test"""
-#     with mock.patch.dict(os.environ, clear=True):
-#         yield
-#
-#
 def test_locate_file_not_exists_raise_exception() -> None:
     with pytest.raises(FileNotFoundError):
         locate("not_exists.txt")
@@ -142,22 +161,11 @@ def test_locate_with_start_path(pytestconfig: pytest.Config) -> None:
 
     assert_that(pyproject, equal_to(expected_path), "pyproject.toml doesn't exist")
 
-# def test_locate_with_invalid_cwd(pytestconfig: pytest.Config) -> None:
-#     invalid_cwd = Path("D:/Users/pytest-textualize/src")
-#     with pytest.raises(FileNotFoundError):
-#         locate("pyproject.toml", cwd=invalid_cwd)
-#
-#
-# @parameterize("value", ["1", "0"])
-# def test_read_force_pytest_color(env: SetEnv, value: str) -> None:
-#     from pytest_textualize.settings import TextualizeSettings
-#
-#     env.set("PY_COLORS", str(value))
-#     env_value = int(os.getenv("PY_COLORS", ""))
-#     settings = TextualizeSettings()
-#     assert_that(settings.env.py_colors, equal_to(env_value), reason="force_pytest_colors")
-#
-#
+def test_locate_with_invalid_cwd(pytestconfig: pytest.Config) -> None:
+    invalid_cwd = Path("D:/Users/pytest-textualize/src")
+    with pytest.raises(FileNotFoundError):
+        locate("pyproject.toml", cwd=invalid_cwd)
+
 # def test_console_settings_properties() -> None:
 #     settings = NoPostInitConsoleSettings()
 #     dump = settings.model_dump()

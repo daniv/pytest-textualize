@@ -15,18 +15,18 @@ from pytest_textualize.plugins.pytest_richtrace import error_console_key
 from pytest_textualize.textualize.logging import TextualizeConsoleLogRender
 
 if TYPE_CHECKING:
-    from pytest_textualize.settings import ConsolePyProjectSettings
+    from pytest_textualize.settings import ConsolePyProjectSettingsModel
 
 
 class ConsoleFactory:
     @staticmethod
-    def check_settings(config: pytest.Config) -> ConsolePyProjectSettings:
+    def check_settings(config: pytest.Config) -> ConsolePyProjectSettingsModel:
         from pytest_textualize.settings import settings_key
 
         textualize_settings = config.stash.get(settings_key, None)
         assert textualize_settings, "No settings found"
-        assert textualize_settings.console_settings, "No console settings found"
-        return textualize_settings.console_settings
+        assert textualize_settings.console, "No console settings found"
+        return textualize_settings.console
 
     @staticmethod
     def console_null_output(config: pytest.Config) -> Console:
@@ -38,39 +38,31 @@ class ConsoleFactory:
 
     @staticmethod
     def console_error_output(config: pytest.Config) -> Console:
-        console_settings = ConsoleFactory.check_settings(config)
-        error_console = config.stash.get(error_console_key, None)
-        if error_console is None:
-            exclude_none = console_settings.model_dump(exclude_none=True, exclude={"argparse_theme"})
-
-            if not sys.stdout.isatty():
-                exclude_none["_environ"] = console_settings.terminal_size_fallback
-
-            from rich.console import Console
-
-            theme = console_settings.get_theme(console_settings.color_system)
-            error_console = Console(
-                stderr=True, style="red", force_interactive=False, theme=theme, **exclude_none
-            )
-            error_console = ConsoleFactory.redirect_log_render(error_console)
-            config.stash.setdefault(error_console_key, error_console)
-
-        return error_console
+        return ConsoleFactory.console_output(config, stderr=True)
 
     @staticmethod
-    def console_output(config: pytest.Config) -> Console:
+    def console_output(config: pytest.Config, stderr: bool = False) -> Console:
         console_settings = ConsoleFactory.check_settings(config)
-        console = config.stash.get(console_key, None)
+        console = (
+            config.stash.get(error_console_key, None) if stderr
+            else config.stash.get(console_key, None)
+        )
         if console is None:
-            exclude_none = console_settings.model_dump(exclude_none=True, exclude={"argparse_theme"})
-            if "theme" in exclude_none:
-                pass
+            exclude_none_unset = console_settings.model_dump(
+                exclude_none=True, exclude_unset=True, exclude={"argparse_theme"}
+            )
+
             if not sys.stdout.isatty():
-                exclude_none["_environ"] = console_settings.terminal_size_fallback
+                exclude_none_unset["_environ"] = console_settings.environ
             from rich.console import Console
 
             theme = console_settings.get_theme(console_settings.color_system)
-            console = Console(stderr=False, theme=theme, **exclude_none)
+            if stderr:
+                console = Console(
+                    stderr=True, style="red", force_interactive=False, theme=theme, **exclude_none_unset
+                )
+            else:
+                console = Console(stderr=False, theme=theme, **exclude_none_unset)
             console = ConsoleFactory.redirect_log_render(console)
             config.stash.setdefault(console_key, console)
 

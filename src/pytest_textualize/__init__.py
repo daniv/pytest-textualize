@@ -11,17 +11,17 @@ __version__ = metadata.version("pytest_textualize")
 
 from pytest_textualize.console_factory import ConsoleFactory
 from pytest_textualize.helpers import get_bool_opt
-from pytest_textualize.settings import ConsolePyProjectSettings
+from pytest_textualize.settings import ConsolePyProjectSettingsModel
 from pytest_textualize.settings import TextualizeSettings
-from pytest_textualize.settings import TracebacksPyProjectSettings
-from pytest_textualize.settings import LoggingPyProjectSettings
+from pytest_textualize.settings import TracebacksPyProjectSettingsModel
+from pytest_textualize.settings import LoggingPyProjectSettingsModel
 
 __all__ = [
     "TextualizeSettings",
     "ConsoleFactory",
-    "ConsolePyProjectSettings",
-    "TracebacksPyProjectSettings",
-    "LoggingPyProjectSettings",
+    "ConsolePyProjectSettingsModel",
+    "TracebacksPyProjectSettingsModel",
+    "LoggingPyProjectSettingsModel",
     "get_bool_opt",
     "reset_logging",
     "configure_logging",
@@ -44,13 +44,13 @@ def reset_logging() -> None:
 def configure_logging(console: Console, txt_settings: TextualizeSettings) -> None:
     log_file_handler: logging.FileHandler | None = None
 
-    log_level = txt_settings.logging_settings.level
+    log_level = txt_settings.logging.level
     if isinstance(log_level, str):
         log_level = logging.getLevelName(log_level)
     try:
         from rich.logging import RichHandler
         from .textualize.logging import TextualizeConsoleLogRender, TextualizeConsoleHandler
-        logging_options = txt_settings.logging_settings.model_dump(exclude_unset=True, exclude={"level"})
+        logging_options = txt_settings.logging.model_dump(exclude_unset=True, exclude={"level"})
         rich_handler = TextualizeConsoleHandler(log_level, console, **logging_options)
     except ValueError as e:
         if str(e).startswith("Unknown level"):
@@ -65,7 +65,7 @@ def configure_logging(console: Console, txt_settings: TextualizeSettings) -> Non
     logging.basicConfig(
         level=logging.NOTSET,
         format=txt_settings.log_format,
-        datefmt=txt_settings.logging_settings.log_time_format,
+        datefmt=txt_settings.logging.log_time_format,
         handlers=[rich_handler],
     )
     logging.captureWarnings(True)

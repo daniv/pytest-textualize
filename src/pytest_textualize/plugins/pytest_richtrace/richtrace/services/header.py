@@ -81,12 +81,13 @@ class PluggyCollectorService:
 
     def _iter_name_plugin(self) -> Generator[tuple[str, object], None, None]:
         for plugin in iter(self.pluginmanager.list_name_plugin()):
-            if str(repr(plugin[1])).find("collector_services") > 0:
+            if str(repr(plugin[1])).find("collector-service") > 0:
                 continue
             yield plugin
 
     def _plugin_distinfo(self) -> list[dict[str, str]]:
         from glom import glom
+        from pprint import saferepr
 
         assert self.config is not None
         assert self.pluginmanager is not None
@@ -94,7 +95,7 @@ class PluggyCollectorService:
         dists: list[dict[str, str]] = []
 
         for plugin, facade in self._iter_distinfo():
-            location = getattr(plugin, "__file__", repr(plugin))
+            location = getattr(plugin, "__file__", saferepr(plugin))
             if Path(location).is_file():
                 location = Path(location).relative_to(self.config.rootpath).as_posix()
             dists.append(
@@ -111,6 +112,7 @@ class PluggyCollectorService:
     def _name_plugin(self) -> list[dict[str, str]]:
         assert self.config is not None
         assert self.pluginmanager is not None
+        from pprint import saferepr
 
         names: list[dict[str, str]] = []
         for name, plugin in self._iter_name_plugin():
@@ -120,7 +122,8 @@ class PluggyCollectorService:
                 if Path(name).is_file():
                     p = Path(name)
                     name = f"{p.parent.name}/{p.name}"
-            location = getattr(plugin, "__file__", repr(plugin))
+
+            location = getattr(plugin, "__file__", saferepr(plugin))
             if Path(location).is_file():
                 try:
                     location = Path(location).relative_to(self.config.rootpath).as_posix()

@@ -4,153 +4,91 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
-from typing import Any
-from typing import Self
-from typing import Sized
+from dataclasses import MISSING
 from typing import TYPE_CHECKING
-from typing import Type
-from typing import TypeVar
+from typing import cast
 
 import pytest
-from attr import dataclass
+from boltons import strutils
 from hamcrest import assert_that
+from hamcrest import contains_string
+from hamcrest import ends_with
 from hamcrest import equal_to
+from hamcrest import instance_of
 from hamcrest import none
-from rich.color import Color
-from rich.console import HighlighterType
-from rich.console import RenderResult
-from rich.style import Style
+from lorem import get_sentence
+from lorem import get_word
+from pydantic import ValidationError
+from rich.color import ANSI_COLOR_NAMES
+from rich.table import Table
 from rich.text import Text
-from rich.text import TextType
-from rich.theme import Theme
-from rich.traceback import PathHighlighter
+from textual import case
+import random
 
-from rich_tests import LOREM_SHORT
+from pytest_textualize.plugins.pytest_richtrace.plugin import skipif_no_console
+from pytest_textualize.textualize.hook_message import PrefixEnum
+from pytest_textualize.textualize.hook_message import tracer_message
 
 if TYPE_CHECKING:
-    from rich.console import Console, ConsoleOptions
+    from rich.console import Console
 
 parameterize = pytest.mark.parametrize
-SizedT = TypeVar("SizedT", bound=Sized)
+param = pytest.param
+random.seed()
 
-THEME = Theme(
-    {
-        "pytest.prefix": Style(color=Color.parse("#B33791")),
-        "pytest.hook": Style(color=Color.parse("#C562AF")),
-        "pytest.hookname": Style(color=Color.parse("#DB8DD0"), italic=True),
-        "pytest.colon": Style(conceal=True),
-        "pytest.najshov": Style(color=Color.parse("#FEC5F6")),
-        "pytest.msg": Style(color=Color.from_ansi(231), dim=True),
-    },
-    inherit=False,
-)
+ANSI_COLOR_KEYS: list[str] = list(ANSI_COLOR_NAMES.keys())
 
+@pytest.fixture(scope="module")
+def color_names() -> list[str]:
+    return list(ANSI_COLOR_NAMES.keys())
 
-class PrefixEnum(StrEnum):
-    PREFIX_SQUARE = " ▪ "
-    PREFIX_BULLET = " • "
-    PREFIX_DASH = " - "
-    PREFIX_BIG_SQUARE = " ■ "
-    PREFIX_BIG_CIRCLE = " ⬤ "
-    BLACK_CIRCLE = " ● "
-    LARGE_CIRCLE = " ○ "
-    MEDIUM_SMALL_WHITE_CIRCLE = " ⚬ "
-    CIRCLED_BULLET = " ⦿ "
-    CIRCLED_WHITE_BULLET = " ⦾ "
-    NARY_BULLET = " ⨀ "
+@parameterize("prefix", [MISSING, PrefixEnum.PREFIX_BIG_SQUARE, MISSING], ids=["x-none", "x-set", "x-missing"])
+@parameterize("info", [MISSING, "hello", MISSING], ids=["inf-none", "inf-set", "inf-missing"])
+@parameterize("escape", [MISSING, True, MISSING], ids=["esc-none", "esc-true", "esc-missing"])
+@parameterize("highlight", [MISSING, True, MISSING], ids=["h-none", "h-true", "h-missing"])
+def test__init__str(prefix: PrefixEnum | None, info: str | None, escape: bool | None, highlight: bool | None) -> None:
+    if prefix is None:
+        with pytest.raises(ValidationError):
+            tracer_message("hookname", **dict(prefix=prefix))
+    elif prefix is MISSING:
+        tr_msg = tracer_message("hookname")
+        assert_that(tr_msg.prefix, equal_to(PrefixEnum.PREFIX_SQUARE), reason="prefix")
+    elif prefix:
+        tr_msg = tracer_message("hookname", prefix=prefix)
+        assert_that(tr_msg.prefix, equal_to(prefix), reason="prefix")
 
+    if info is None or info is MISSING:
+        if MISSING:
+            tr_msg = tracer_message("hookname")
+        else:
+            tr_msg = tracer_message("hookname", **dict(info=info))
+        assert_that(tr_msg.info, none(), reason="info")
+    else:
+        tr_msg = tracer_message("hookname", info=info)
+        assert_that(tr_msg.info, equal_to(info), reason="info")
 
-@dataclass(repr=False, frozen=True)
-class ReportItem:
-    name: str
-    type: Type[Any]
-    value: Any
+    if escape is None:
+        with pytest.raises(ValidationError):
+            tracer_message("hookname", **dict(escape=escape) )
+    elif MISSING:
+        tr_msg = tracer_message("hookname")
+        assert_that(tr_msg.info, equal_to(False), reason="escape")
+    else:
+        tr_msg = tracer_message("hookname", escape=escape)
+        assert_that(tr_msg.info, equal_to(True), reason="escape")
 
-    def __repr__(self) -> str:
-        return f"ReportItem({self.name!r}, type={self.type!r})"
-
-
-@dataclass
-class ReportItemGroup:
-    name: str
-    group_tems: list[ReportItem] = []
-
-    def add_report_item(self, item: ReportItem) -> Self:
-        self.group_tems.append(item)
-        return self
-
-
-class HookMessage:
-    def __init__(
-            self,
-            hookname: str,
-            *,
-            info: TextType | None = None,
-            prefix: PrefixEnum = PrefixEnum.PREFIX_SQUARE,
-            highlighter: HighlighterType | None = None,
-            escape: bool = False,
-    ) -> None:
-        self.hookname = hookname
-        self.prefix = prefix
-        self.info = info
-        self.highlighter = highlighter
-        self.escape = escape
-
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-
-        yield Text.assemble(
-            (f"{self.prefix}", "pytest.prefix"),
-            ("hook", "pytest.hook"),
-            (": ", "pytest.colon"),
-            (self.hookname.ljust(30), "pytest.hookname"),
-            end=" ",
-        )
-        if self.info and isinstance(self.info, str):
-            info = self.info
-            if self.escape:
-                from rich.markup import escape
-
-                yield escape(info)
-
-            elif self.highlighter:
-                yield Text.assemble(self.highlighter(info))
-            else:
-                yield Text.assemble(info, style="pytest.msg")
-
-        yield "\n"
+    if highlight is None:
+        with pytest.raises(ValidationError):
+            tracer_message("hookname", **dict(highlight=highlight))
+    elif MISSING:
+        tr_msg = tracer_message("hookname")
+        assert_that(tr_msg.prefix, equal_to(False), reason="highlight")
+    else:
+        tr_msg = tracer_message("hookname", highlight=highlight)
+        assert_that(tr_msg.prefix, equal_to(True), reason="highlight")
 
 
-@pytest.fixture(scope="function", autouse=True)
-def push_theme(console: Console) -> None:
-    console.push_theme(THEME, inherit=False)
-    yield
-    console.pop_theme()
-
-
-def test_hook_msg_default_builder(console: Console) -> None:
-    hm = HookMessage("pytest_configure")
-
-    assert_that(hm.hookname, equal_to("pytest_configure"), reason="hookname")
-    assert_that(hm.info, none(), reason="info")
-    assert_that(hm.prefix, equal_to(PrefixEnum.PREFIX_SQUARE), reason="info")
-    assert_that(hm.highlighter, none(), reason="info")
-    assert_that(hm.escape, equal_to(False), reason="info")
-    assert_that(hm.info, none(), reason="info str")
-    if console:
-        console.line(2)
-        console.print(hm)
-
-
-def test_hook_msg_default_add_plain_info_str(console: Console) -> None:
-    info = "the sum of 3 + 5 is=8 'yeah!'"
-    hm = HookMessage("pytest_configure", info=info)
-    assert_that(hm.info, equal_to(info), reason="info")
-    if console:
-        console.line(2)
-        console.print(hm)
-
-
+@skipif_no_console
 @parameterize(
     "prefix",
     [
@@ -161,7 +99,6 @@ def test_hook_msg_default_add_plain_info_str(console: Console) -> None:
         PrefixEnum.PREFIX_BIG_CIRCLE,
         PrefixEnum.BLACK_CIRCLE,
         PrefixEnum.LARGE_CIRCLE,
-        PrefixEnum.MEDIUM_SMALL_WHITE_CIRCLE,
         PrefixEnum.CIRCLED_BULLET,
         PrefixEnum.CIRCLED_WHITE_BULLET,
         PrefixEnum.NARY_BULLET,
@@ -174,171 +111,270 @@ def test_hook_msg_default_add_plain_info_str(console: Console) -> None:
         "prefix_big_circle",
         "black_circle",
         "large_circle",
-        "medium_small_white_circle",
         "circled_bullet",
         "circled_white_bullet",
         "nary_bullet",
     ],
 )
 def test_different_prefixes(
-        request: pytest.FixtureRequest, console: Console, prefix: PrefixEnum
+    request: pytest.FixtureRequest, console: Console | None, prefix: PrefixEnum
 ) -> None:
     info = f"i am PrefixEnum.'{request.node.callspec.id.upper()}' prefix"
-    hm = HookMessage("pytest_configure", info=info, prefix=prefix)
-    assert_that(hm.prefix, equal_to(prefix), reason="prefix")
-    if console:
-        console.line(2)
-        console.print(hm, markup=True)
+    tr_msg = tracer_message("pytest_configure", info=info, prefix=prefix)
+    assert_that(tr_msg.prefix, equal_to(prefix), reason="prefix")
+    console.line(1)
+    tr_msg(console)
 
 
-def test_with_text_objects_un_styled(console: Console) -> None:
-    info = Text("the sum of 3 + 5 is=8 'yeah!'")
-    hm = HookMessage("pytest_configure", info=info)
-    if console:
-        console.line(2)
-        console.print(hm)
+def test__init__str_info(console: Console | None, capsys: pytest.CaptureFixture[str]) -> None:
+    str_msg = get_word(2)
+    tr_msg = tracer_message("pytest_configure", info=str_msg)
+    assert_that(tr_msg.info, equal_to(str_msg), reason="info")
+    tr_msg(console)
+
+    if console is not None:
+        captured = capsys.readouterr().out
+        actual = Text.from_ansi(captured).plain.rstrip()
+        assert_that(
+            actual,
+            ends_with(str_msg),
+            reason="clean output with info",
+        )
+
+def test__init__no_call(capsys: pytest.CaptureFixture[str]) -> None:
+    tracer_message("pytest_configure")
+    captured = capsys.readouterr().out
+    assert_that(captured, equal_to(""), reason="no call")
 
 
-def test_with_text_styled_objects(console: Console) -> None:
-    info = Text("the sum of 3 + 5 is=8 'yeah!'", style="bright_yellow")
-    hm = HookMessage("pytest_configure", info=info)
-    if console:
-        console.line(2)
-        console.print(hm)
+def test__call__console_none(capsys: pytest.CaptureFixture[str]) -> None:
+    tr_msg = tracer_message("pytest_configure")
+    table = tr_msg(console=None)
+    captured = capsys.readouterr().out
+    assert_that(captured, equal_to(""), reason="no call")
+    assert_that(cast(object, table), instance_of(Table), reason="type(Table)")
 
 
-def test_with_highlighter(console: Console) -> None:
-    info = "test-textualize/.venv/Lib/site-packages/rich/_log_render.py"
-    console.print(info)
-    hm = HookMessage("pytest_configure", info=info, highlighter=PathHighlighter())
-    if console:
-        console.line(2)
-        console.print(hm)
+@skipif_no_console
+def test__call__str_info_markup(
+    console: Console | None, capsys: pytest.CaptureFixture[str], color_names: list[str]
+) -> None:
+    def func(s: str) -> str:
+        int_num = random.randint(0, len(color_names) - 1)
+        style = color_names[int_num]
+        return f"[{style}]{s}[/{style}]"
 
 
-def test_with_escape(console: Console) -> None:
-    info = "this [type] of message not markup[/]"
-    console.print(info)
-    hm = HookMessage("pytest_configure", info=info, escape=True)
-    if console:
-        console.line(2)
-        console.print(hm)
+    str_msg = get_word(2, func=func)
+    tr_msg = tracer_message("pytest_configure", info=f"info -> {str_msg}")
 
-
-def test_hook_msg_default_add_plain_info_str_with_markup(console: Console) -> None:
-    info = "the [bright_yellow]sum[/] of [b]3[/] + 5 is=8 'yeah!'"
-
-    hm = HookMessage("pytest_configure", info=info)
-    if console:
-        console.line(2)
-        console.print(hm)
-
-
-def test_styles_for_hook_message(console: Console) -> None:
-    theme_eight = Theme(
-        {
-            "args": Style(color=Color.from_ansi(230), bold=True, dim=True),
-            "text": Style(color=Color.from_ansi(231), dim=True),
-            "groups": Style(color=Color.from_ansi(231)),
-            "help": Style(color=Color.from_ansi(230), italic=True),
-            "metavar": Style(color=Color.from_ansi(184)),
-            "prog": Style(color=Color.from_ansi(208), bold=True),
-            "syntax": Style(color=Color.from_ansi(190), bold=True),
-            "add_enum": Style(color=Color.from_ansi(153), bold=False),
-            "help2": Style(color=Color.from_ansi(144)),
-            "groups2": Style(color=Color.from_ansi(138), dim=True),
-            "args2": Style(color=Color.from_ansi(153), bold=True),
-            "text2": Style(color=Color.from_ansi(144)),
-        }
-    )
-    theme_true = Theme(
-        {
-            "BLUE5": Style(color=Color.parse("#B3C8CF")),
-            "BLUE6": Style(color=Color.parse("#51829B")),
-            "BLUE7": Style(color=Color.parse("#F2F2F2")),
-            "BLUE8": Style(color=Color.parse("#C2D0E9")),
-            "BLUE9": Style(color=Color.parse("#91ACDF")),
-            "BLUE10": Style(color=Color.parse("#EEE9DA")),
-            "BLUE11": Style(color=Color.parse("#BDCDD6")),
-            "BLUE12": Style(color=Color.parse("#93BFCF")),
-            "BLUE13": Style(color=Color.parse("#6096B4")),
-            "BLUE13B": Style(color=Color.parse("#6096B4"), bold=True),
-            "BLUE13I": Style(color=Color.parse("#6096B4"), italic=True),
-            "BLUE13IB": Style(color=Color.parse("#6096B4"), italic=True, bold=True),
-        }
-    )
-    # with open("C:/Users/solma/PycharmProjects/pytest-textualize/static/styles/truecolor_styles.ini",
-    #           "wt") as write_theme:
-    #     write_theme.write(theme_true.config)
-    # pass
-
-    BLUE5 = Style(color=Color.parse("#B3C8CF"))
-    BLUE6 = Style(color=Color.parse("#51829B"))
-    BLUE7 = Style(color=Color.parse("#f2f2f2"))
-    BLUE8 = Style(color=Color.parse("#c2d0e9"))
-    BLUE9 = Style(color=Color.parse("#91ACDF"))
-    BLUE10 = Style(color=Color.parse("#EEE9DA"))
-    BLUE11 = Style(color=Color.parse("#BDCDD6"))
-    BLUE12 = Style(color=Color.parse("#93BFCF"))
-    BLUE13 = Style(color=Color.parse("#6096B4"))
-
-    LGREEN1 = Style(color=Color.parse("#B0DB9C"))
-    LGREEN2 = Style(color=Color.parse("#CAE8BD"))
-    LGREEN3 = Style(color=Color.parse("#DDF6D2"))
-    LGREEN4 = Style(color=Color.parse("#ECFAE5"))
-
-    PASTEL1 = Style(color=Color.parse("#727D73"))
-    PASTEL2 = Style(color=Color.parse("#AAB99A"))
-    PASTEL3 = Style(color=Color.parse("#D0DDD0"))
-    PASTEL4 = Style(color=Color.parse("#F0F0D7"))
-    PASTEL5 = Style(color=Color.parse("#99BC85"))
-    PASTEL6 = Style(color=Color.parse("#BFD8AF"))
-    PASTEL7 = Style(color=Color.parse("#D4E7C5"))
-    PASTEL8 = Style(color=Color.parse("#E1F0DA"))
-    PASTEL9 = Style(color=Color.parse("#A4BC92"))
-    PASTEL10 = Style(color=Color.parse("#B3C99C"))
-    PASTEL11 = Style(color=Color.parse("#C7E9B0"))
-    PASTEL12 = Style(color=Color.parse("#C7E9B0"))
-    PASTEL13 = Style(color=Color.parse("#DDFFBB"))
-
-    if console:
-        console.line(2)
-        console.rule("Green combinations")
-        console.print(LOREM_SHORT, style=BLUE5)
-        console.print(LOREM_SHORT, style=BLUE6)
-        console.print(LOREM_SHORT, style=BLUE6)
-        console.print(LOREM_SHORT, style=BLUE7)
-        console.print(LOREM_SHORT, style=BLUE8)
-        console.print(LOREM_SHORT, style=BLUE9)
-        console.print(LOREM_SHORT, style=BLUE10)
-        console.print(LOREM_SHORT, style=BLUE11)
-        console.print(LOREM_SHORT, style=BLUE12)
-        console.print(LOREM_SHORT, style=BLUE13)
-        console.rule("Green combinations")
-        console.print(LOREM_SHORT, style=LGREEN1)
-        console.print(LOREM_SHORT, style=LGREEN2)
-        console.print(LOREM_SHORT, style=LGREEN3)
-        console.print(LOREM_SHORT, style=LGREEN4)
-
-        console.rule("Pastel combinations")
-        console.print(LOREM_SHORT, style=PASTEL1)
-        console.print(LOREM_SHORT, style=PASTEL2)
-        console.print(LOREM_SHORT, style=PASTEL3)
-        console.print(LOREM_SHORT, style=PASTEL4)
-        console.print(LOREM_SHORT, style=PASTEL5)
-        console.print(LOREM_SHORT, style=PASTEL6)
-        console.print(LOREM_SHORT, style=PASTEL7)
-        console.print(LOREM_SHORT, style=PASTEL8)
-        console.print(LOREM_SHORT, style=PASTEL9)
-        console.print(LOREM_SHORT, style=PASTEL10)
-        console.print(LOREM_SHORT, style=PASTEL11)
-        console.print(LOREM_SHORT, style=PASTEL12)
-        console.print(LOREM_SHORT, style=PASTEL13)
-
-
-def test_load_from_file(console: Console):
-    load_theme = Theme.read(
-        "C:/Users/solma/PycharmProjects/pytest-textualize/static/styles/truecolor_styles.ini"
+    console.line(1)
+    tr_msg(console)
+    captured = capsys.readouterr().out
+    actual = strutils.strip_ansi(captured).strip()
+    from_markup = Text.from_markup(str_msg).plain
+    assert_that(
+        actual,
+        ends_with(from_markup),
+        reason="captured from_ansi to plain"
     )
 
-    y = 0
+
+@skipif_no_console
+def test__call__str_info_markup_printed(console: Console | None) -> None:
+    str_msg = get_word(3)
+    tr_msg = tracer_message("pytest_configure", info=f"info -> {str_msg}")
+    console.line(1)
+    tr_msg(console)
+
+
+@skipif_no_console
+def test__call__str_no_escape_no_markup(console: Console | None, capsys: pytest.CaptureFixture[str]) -> None:
+    sentence = get_sentence()
+    sentence = f"[placeholder]{sentence}"
+    tr_msg = tracer_message("pytest_configure", info=sentence)
+    console.line(1)
+    tr_msg(console)
+    captured = capsys.readouterr().out
+    actual = strutils.strip_ansi(captured).strip()
+    with pytest.raises(AssertionError) as exc_info:
+        assert_that(actual, contains_string("[placeholder]"), reason="[placeholder] not escaped")
+
+    assert_that(exc_info.value.args[0].out, contains_string("but: was"), reason="[placeholder] not printed")
+
+
+@skipif_no_console
+def test__call__str_no_escape_w_markups(console: Console | None, capsys: pytest.CaptureFixture[str]) -> None:
+    sentence = get_sentence(1)
+    sentence = f"[bright_blue][placeholder][/]{sentence}"
+    tr_msg = tracer_message("pytest_configure", info=sentence)
+    console.line(1)
+    tr_msg(console)
+    captured = capsys.readouterr().out
+    actual = strutils.strip_ansi(captured).strip()
+    with pytest.raises(AssertionError) as exc_info:
+        assert_that(actual, contains_string("[placeholder]"), reason="[placeholder] not escaped")
+
+    assert_that(exc_info.value.args[0].out, contains_string("but: was"), reason="[placeholder] not printed")
+
+
+@skipif_no_console
+def test__call__str_escape_no_markup(console: Console | None, capsys: pytest.CaptureFixture[str]) -> None:
+    sentence = get_word(2)
+    sentence = f"[placeholder]{sentence}"
+    tr_msg = tracer_message("pytest_configure", info=sentence, escape=True)
+    console.line(1)
+    tr_msg(console)
+    captured = capsys.readouterr().out
+    actual = strutils.strip_ansi(captured)
+    assert_that(actual, contains_string("[placeholder]"), reason="[placeholder] not escaped")
+
+
+@skipif_no_console
+def test__call__str_highlight(console: Console | None) -> None:
+    sentence = "calc: 2 + 2 = 4"
+    tr_msg = tracer_message("pytest_configure", info=sentence, highlight=True)
+    console.line(1)
+    tr_msg(console)
+
+
+@skipif_no_console
+def test_with_text_objects_un_styled(console: Console | None) -> None:
+    info = Text(get_sentence(1))
+    tr_msg = tracer_message("pytest_configure", info=info)
+    if console:
+        console.line(1)
+        tr_msg(console)
+
+
+@skipif_no_console
+def test_with_text_objects_styled(console: Console | None) -> None:
+    info = Text(get_sentence(1), style="#C599B6")
+    tr_msg = tracer_message("pytest_configure", info=info)
+    if console:
+        console.line(1)
+        tr_msg(console)
+
+
+@skipif_no_console
+def test_with_text_objects_un_styled_highlight(console: Console | None) -> None:
+    info = Text("calc: 2 + 2 = 4")
+    tr_msg = tracer_message("pytest_configure", info=info, highlight=True)
+    if console:
+        console.line(1)
+        tr_msg(console)
+
+
+
+
+#
+
+#
+# def test_styles_for_hook_message(console: Console) -> None:
+#     theme_eight = Theme(
+#         {
+#             "args": Style(color=Color.from_ansi(230), bold=True, dim=True),
+#             "text": Style(color=Color.from_ansi(231), dim=True),
+#             "groups": Style(color=Color.from_ansi(231)),
+#             "help": Style(color=Color.from_ansi(230), italic=True),
+#             "metavar": Style(color=Color.from_ansi(184)),
+#             "prog": Style(color=Color.from_ansi(208), bold=True),
+#             "syntax": Style(color=Color.from_ansi(190), bold=True),
+#             "add_enum": Style(color=Color.from_ansi(153), bold=False),
+#             "help2": Style(color=Color.from_ansi(144)),
+#             "groups2": Style(color=Color.from_ansi(138), dim=True),
+#             "args2": Style(color=Color.from_ansi(153), bold=True),
+#             "text2": Style(color=Color.from_ansi(144)),
+#         }
+#     )
+#     theme_true = Theme(
+#         {
+#             "BLUE5": Style(color=Color.parse("#B3C8CF")),
+#             "BLUE6": Style(color=Color.parse("#51829B")),
+#             "BLUE7": Style(color=Color.parse("#F2F2F2")),
+#             "BLUE8": Style(color=Color.parse("#C2D0E9")),
+#             "BLUE9": Style(color=Color.parse("#91ACDF")),
+#             "BLUE10": Style(color=Color.parse("#EEE9DA")),
+#             "BLUE11": Style(color=Color.parse("#BDCDD6")),
+#             "BLUE12": Style(color=Color.parse("#93BFCF")),
+#             "BLUE13": Style(color=Color.parse("#6096B4")),
+#             "BLUE13B": Style(color=Color.parse("#6096B4"), bold=True),
+#             "BLUE13I": Style(color=Color.parse("#6096B4"), italic=True),
+#             "BLUE13IB": Style(color=Color.parse("#6096B4"), italic=True, bold=True),
+#         }
+#     )
+#     # with open("C:/Users/solma/PycharmProjects/pytest-textualize/static/styles/truecolor_styles.ini",
+#     #           "wt") as write_theme:
+#     #     write_theme.write(theme_true.config)
+#     # pass
+#
+#     BLUE5 = Style(color=Color.parse("#B3C8CF"))
+#     BLUE6 = Style(color=Color.parse("#51829B"))
+#     BLUE7 = Style(color=Color.parse("#f2f2f2"))
+#     BLUE8 = Style(color=Color.parse("#c2d0e9"))
+#     BLUE9 = Style(color=Color.parse("#91ACDF"))
+#     BLUE10 = Style(color=Color.parse("#EEE9DA"))
+#     BLUE11 = Style(color=Color.parse("#BDCDD6"))
+#     BLUE12 = Style(color=Color.parse("#93BFCF"))
+#     BLUE13 = Style(color=Color.parse("#6096B4"))
+#
+#     LGREEN1 = Style(color=Color.parse("#B0DB9C"))
+#     LGREEN2 = Style(color=Color.parse("#CAE8BD"))
+#     LGREEN3 = Style(color=Color.parse("#DDF6D2"))
+#     LGREEN4 = Style(color=Color.parse("#ECFAE5"))
+#
+#     PASTEL1 = Style(color=Color.parse("#727D73"))
+#     PASTEL2 = Style(color=Color.parse("#AAB99A"))
+#     PASTEL3 = Style(color=Color.parse("#D0DDD0"))
+#     PASTEL4 = Style(color=Color.parse("#F0F0D7"))
+#     PASTEL5 = Style(color=Color.parse("#99BC85"))
+#     PASTEL6 = Style(color=Color.parse("#BFD8AF"))
+#     PASTEL7 = Style(color=Color.parse("#D4E7C5"))
+#     PASTEL8 = Style(color=Color.parse("#E1F0DA"))
+#     PASTEL9 = Style(color=Color.parse("#A4BC92"))
+#     PASTEL10 = Style(color=Color.parse("#B3C99C"))
+#     PASTEL11 = Style(color=Color.parse("#C7E9B0"))
+#     PASTEL12 = Style(color=Color.parse("#C7E9B0"))
+#     PASTEL13 = Style(color=Color.parse("#DDFFBB"))
+#
+#     if console:
+#         console.line(2)
+#         console.rule("Green combinations")
+#         console.print(LOREM_SHORT, style=BLUE5)
+#         console.print(LOREM_SHORT, style=BLUE6)
+#         console.print(LOREM_SHORT, style=BLUE6)
+#         console.print(LOREM_SHORT, style=BLUE7)
+#         console.print(LOREM_SHORT, style=BLUE8)
+#         console.print(LOREM_SHORT, style=BLUE9)
+#         console.print(LOREM_SHORT, style=BLUE10)
+#         console.print(LOREM_SHORT, style=BLUE11)
+#         console.print(LOREM_SHORT, style=BLUE12)
+#         console.print(LOREM_SHORT, style=BLUE13)
+#         console.rule("Green combinations")
+#         console.print(LOREM_SHORT, style=LGREEN1)
+#         console.print(LOREM_SHORT, style=LGREEN2)
+#         console.print(LOREM_SHORT, style=LGREEN3)
+#         console.print(LOREM_SHORT, style=LGREEN4)
+#
+#         console.rule("Pastel combinations")
+#         console.print(LOREM_SHORT, style=PASTEL1)
+#         console.print(LOREM_SHORT, style=PASTEL2)
+#         console.print(LOREM_SHORT, style=PASTEL3)
+#         console.print(LOREM_SHORT, style=PASTEL4)
+#         console.print(LOREM_SHORT, style=PASTEL5)
+#         console.print(LOREM_SHORT, style=PASTEL6)
+#         console.print(LOREM_SHORT, style=PASTEL7)
+#         console.print(LOREM_SHORT, style=PASTEL8)
+#         console.print(LOREM_SHORT, style=PASTEL9)
+#         console.print(LOREM_SHORT, style=PASTEL10)
+#         console.print(LOREM_SHORT, style=PASTEL11)
+#         console.print(LOREM_SHORT, style=PASTEL12)
+#         console.print(LOREM_SHORT, style=PASTEL13)
+#
+#
+# def test_load_from_file(console: Console):
+#     load_theme = Theme.read(
+#         "C:/Users/solma/PycharmProjects/pytest-textualize/static/styles/truecolor_styles.ini"
+#     )
+#
+#     y = 0
