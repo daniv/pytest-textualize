@@ -100,3 +100,19 @@ def tracer_message(
     if console is not None:
         trm(console)
     return trm
+
+def keyval_msg(
+        key: str,
+        value: TextType,
+        *,
+        console: Console | None = None,
+        prefix: PrefixEnum = PrefixEnum.PREFIX_BULLET,
+        value_style: StyleType | None = "",
+        escape: bool = False,
+        highlight: bool = False,
+) -> KeyValueMessage:
+    from pytest_textualize.textualize.console import KeyValueMessage
+    kvm = KeyValueMessage(key, value, prefix=prefix, value_style=value_style, highlight=highlight, escape=escape)
+    if console is not None:
+        kvm(console)
+    return kvm
