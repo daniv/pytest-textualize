@@ -30,7 +30,7 @@ parameterize = pytest.mark.parametrize
 
 @pytest.mark.tryfirst
 def test_console_output(pytestconfig: pytest.Config) -> None:
-    textualize_settings = TextualizeSettings()
+    textualize_settings = TextualizeSettings(pytestconfig=pytestconfig)
     pytestconfig.stash.setdefault(settings_key, textualize_settings)
 
     console = ConsoleFactory.console_output(pytestconfig)
@@ -46,7 +46,7 @@ def test_console_output(pytestconfig: pytest.Config) -> None:
 
 
 def test_console_error_output(pytestconfig: pytest.Config) -> None:
-    textualize_settings = TextualizeSettings()
+    textualize_settings = TextualizeSettings(pytestconfig=pytestconfig)
     pytestconfig.stash.setdefault(settings_key, textualize_settings)
 
     err_console = ConsoleFactory.console_error_output(pytestconfig)
@@ -84,7 +84,7 @@ def test_console_null_output(pytestconfig: pytest.Config) -> None:
 
 
 def test_console_buffered_output(pytestconfig: pytest.Config) -> None:
-    textualize_settings = TextualizeSettings()
+    textualize_settings = TextualizeSettings(pytestconfig=pytestconfig)
     pytestconfig.stash.setdefault(settings_key, textualize_settings)
 
     pytestconfig.stash[console_key] = None

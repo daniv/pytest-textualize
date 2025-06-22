@@ -8,10 +8,18 @@ from typing import TYPE_CHECKING
 
 import pluggy
 import pytest
+from rich.highlighter import ReprHighlighter
+from rich.text import Text
 
+from pytest_textualize import settings
+
+from pytest_textualize.plugins import cleanup_factory
+from pytest_textualize.plugins.pytest_richtrace import console_key
 from pytest_textualize.settings import Verbosity
+from pytest_textualize.settings import settings_key
 
 if TYPE_CHECKING:
+    from pytest_textualize.plugins import PytestPlugin
     from pytest_textualize.plugins import TestRunResults
     from pytest_textualize.settings import TextualizeSettings
     from rich.console import Console
@@ -22,9 +30,9 @@ class TextualizeTracer:
 
     def __init__(self, config: pytest.Config) -> None:
         self.config = config
-        self.console: Console | None = None
+        self.console: Console = config.stash.get(console_key, None)
         self._lock = threading.Lock()
-        self.settings: TextualizeSettings | None = None
+        self.settings: TextualizeSettings = config.stash.get(settings_key, None)
         self.test_results: TestRunResults | None = None
         self.hook_relay: pluggy.HookRelay | None = None
         self._start_time: str | None = None
@@ -41,15 +49,17 @@ class TextualizeTracer:
     def show_header(self) -> bool:
         return self.verbosity >= Verbosity.NORMAL
 
-    def pytest_console_and_settings(self, console: Console, settings: TextualizeSettings) -> None:
-        self.settings = settings
-        self.console = console
+    # @pytest.hookimpl(tryfirst=True)
+    # def pytest_plugin_registered(self, plugin: PytestPlugin, plugin_name: str) -> None:
+    #     if plugin_name == "terminalreporter":
+    #         self.config.pluginmanager.set_blocked(plugin_name)
 
     @pytest.hookimpl(tryfirst=True)
     def pytest_configure(self, config: pytest.Config) -> None:
         from pytest_textualize.plugins import cleanup_factory
         from pytest_textualize.plugins import TestRunResults
         from .textualize_reporter import TextualizeReporter
+        from .timer import TextualizeExecutionTimer
         from .error_observer import ErrorExecutionObserver
 
         pluginmanager = config.pluginmanager
@@ -60,15 +70,20 @@ class TextualizeTracer:
 
         # -- Adding a list of textualize plugins to be monitored in plugin_registered hook
         reporter = TextualizeReporter(config)
+        timer = TextualizeExecutionTimer(self.test_results)
         reporter.monitored_classes.extend(
             [
                 ErrorExecutionObserver.name,
                 "textualize-collection-observer",
                 "textualize-test-result-observer",
                 "pytest-textualize",
+                TextualizeExecutionTimer.name,
                 self.name,
             ]
         )
+
+        # -- registering the timer plugin
+        pluginmanager.register(timer, name=TextualizeExecutionTimer.name)
 
         # -- registering the reporter plugin
         pluginmanager.register(reporter, name=TextualizeReporter.name)
@@ -98,7 +113,7 @@ class TextualizeTracer:
         if not self.show_header:
             return
         self.console.rule(
-            f"[#D1F8EF]Session '{session.name}' starts", characters="=", style="#A1E3F9"
+            f"[#D1F8EF]Session '{session.name}' started at {self._start_time}", characters="=", style="#A1E3F9"
         )
         if not self.no_header:
             from .services.header import HeaderServiceManager
@@ -111,6 +126,16 @@ class TextualizeTracer:
             environment_data = hook.pytest_collect_env_info(config=session.config)
             manager.teardown(session.config)
             hook.pytest_render_header(config=session.config, data=environment_data)
+
+    @pytest.hookimpl
+    def pytest_collection_finish(self, session: pytest.Session) -> None:
+
+        from .test_execution_observer import TestExecutionObserver
+        reporter = session.config.pluginmanager.getplugin("pytest-textualize-reporter")
+        reporter.monitored_classes.append(TestExecutionObserver.name)
+        execution_observer = TestExecutionObserver(session.config, self.test_results)
+        session.config.pluginmanager.register(execution_observer, TestExecutionObserver.name)
+        session.config.add_cleanup(cleanup_factory(session.config.pluginmanager, execution_observer))
 
     def __repr__(self) -> str:
         return (

@@ -3,6 +3,42 @@
 # Dir Path : src/pytest_textualize
 from __future__ import annotations
 
+import os
+from enum import Enum
+from typing import Any
+from typing import NoReturn
+from typing import Protocol
+from typing import TypeVar
+from typing import get_args
+
+Comp_T = TypeVar("Comp_T", bound="Comparable")
+
+
+class ToDictable(Protocol):
+    """Any object with a to_dict() method."""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Converts this object to a dictionary."""
+
+
+class Comparable(Protocol):
+    """A type that can be compared and sorted."""
+
+    def __eq__(self, other: Any) -> bool:  # noqa: D105
+        pass
+
+    def __lt__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
+        pass
+
+    def __gt__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
+        pass
+
+    def __le__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
+        pass
+
+    def __ge__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
+        pass
+
 
 def get_bool_opt(opt_name: str, string: str) -> bool:
     if isinstance(string, bool):
@@ -38,7 +74,7 @@ def get_int_opt(opt_name: str, string: str) -> int:
         )
 
 
-def get_list_opt(opt_name: str, string: str) -> list[str]:
+def get_list_opt(opt_name: str, string: str | list[str] | tuple[str, ...]) -> list[str]:
     if isinstance(string, str):
         return string.split()
     elif isinstance(string, (list, tuple)):
@@ -47,3 +83,50 @@ def get_list_opt(opt_name: str, string: str) -> list[str]:
         raise ValueError(
             f"Invalid type {string!r} for option {opt_name}; you " "must give a list value"
         )
+
+
+def literal_to_list(literal: Any) -> list[None | bool | bytes | int | str | Enum]:
+    """
+    Convert a typing.Literal into a list.
+
+    Examples:
+        >>> from typing import Literal
+        >>> literal_to_list(Literal['a', 'b', 'c'])
+        ['a', 'b', 'c']
+
+        >>> literal_to_list(Literal['a', 'b', Literal['c', 'd', Literal['e']]])
+        ['a', 'b', 'c', 'd', 'e']
+
+        >>> literal_to_list(Literal['a', 'b', Literal[1, 2, Literal[None]]])
+        ['a', 'b', 1, 2, None]
+    """
+    result = []
+
+    for arg in get_args(literal):
+        if arg is None or isinstance(arg, (bool, bytes, int, str, Enum)):
+            result.append(arg)
+        else:
+            result.extend(literal_to_list(arg))
+
+    return result
+
+
+class SetEnv:
+    """
+    This class was taken from https://github.com/pydantic/pydantic-settings
+    """
+
+    def __init__(self) -> None:
+        self.envars: set[Any] = set()
+
+    def set(self, name: str, value: Any) -> None:
+        self.envars.add(name)
+        os.environ[name] = value
+
+    def pop(self, name: str) -> None:
+        self.envars.remove(name)
+        os.environ.pop(name)
+
+    def clear(self) -> None:
+        for n in self.envars:
+            os.environ.pop(n)

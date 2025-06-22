@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from pytest_textualize.plugins.pytest_richtrace import console_key
+from pytest_textualize.plugins.pytest_richtrace import error_console_key
+from pytest_textualize.settings import settings_key
+
 if TYPE_CHECKING:
     from pytest_textualize import TextualizeSettings
     from pytest_textualize.plugins import TestRunResults
@@ -22,12 +26,9 @@ class ErrorExecutionObserver:
     def __init__(self, config: pytest.Config, results: TestRunResults):
         self.config = config
         self.test_run_results = results
-        self.console: Console | None = None
-        self.settings: TextualizeSettings | None = None
-
-    def pytest_console_and_settings(self, console: Console, settings: TextualizeSettings) -> None:
-        self.settings = settings
-        self.console = console
+        self.console: Console = config.stash.get(console_key, None)
+        self.error_console: Console = config.stash.get(error_console_key, None)
+        self.settings: TextualizeSettings = config.stash.get(settings_key, None)
 
     @pytest.hookimpl
     def pytest_configure(self, config: pytest.Config) -> None:
