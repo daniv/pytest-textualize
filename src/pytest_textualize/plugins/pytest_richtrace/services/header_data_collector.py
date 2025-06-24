@@ -14,6 +14,8 @@ from typing import cast
 
 import pytest
 
+from pytest_textualize import TextualizePlugins
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from typing import Any
@@ -284,12 +286,8 @@ class HeaderServiceManager:
     ]
 
     def setup(self, config: pytest.Config) -> None:
-        from ..textualize_reporter import TextualizeReporter
-
-        plugin = config.pluginmanager.getplugin(TextualizeReporter.name)
-        cast(TextualizeReporter, plugin).monitored_classes.extend(self.names)
-
-        pass
+        plugin = config.pluginmanager.getplugin(TextualizePlugins.REGISTRATION_SERVICE)
+        plugin.monitored_classes.extend(self.names)
 
     def call(self, config: pytest.Config):
         collector_wrapper = CollectorWrapper()

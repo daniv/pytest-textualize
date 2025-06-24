@@ -1,280 +1,163 @@
-# Project : pytest-textualize
-# File Name : textualize_reporte py
-# Dir Path : src/pytest_textualize/plugins/pytest_richtrace/richtrace
 from __future__ import annotations
 
-import sys
 import textwrap
-import threading
-
-from functools import cached_property
 from pathlib import Path
 from pprint import saferepr
 from typing import Any
-from typing import ClassVar
 from typing import cast
 
-
-from rich.traceback import PathHighlighter
-from rich.text import Text
-from rich.table import Table
+import pytest
 from rich import box
-from rich.pretty import Pretty
+from rich.columns import Columns
+from rich.console import render_scope
+from rich.markup import escape
 from rich.padding import Padding
 from rich.panel import Panel
-from rich.columns import Columns
-
-import pytest
+from rich.pretty import Pretty
+from rich.table import Table
+from rich.text import Text
+from rich.traceback import PathHighlighter
 from typing_extensions import TYPE_CHECKING
 from typing_extensions import assert_never
 
-from pytest_textualize.plugins.pytest_richtrace import console_key
+from pytest_textualize import TextualizePlugins
+from pytest_textualize import highlighted_nodeid
+from pytest_textualize import hook_msg
+from pytest_textualize import key_value_scope
+from pytest_textualize import keyval_msg
+from pytest_textualize.plugins.pytest_richtrace.base import BaseTextualizePlugin
 from pytest_textualize.settings import Verbosity
-from pytest_textualize.settings import settings_key
-from pytest_textualize.textualize.hook_message import KeyValueMessage
-from pytest_textualize.textualize.hook_message import tracer_message
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
     from typing import MutableMapping
-    from rich.console import Console
-    from pytest_textualize.plugins import PytestPlugin
-    from pytest_textualize import TextualizeSettings
     from rich.console import ConsoleRenderable
 
-path_highlighter = PathHighlighter()
 
+class TextualizeReporter(BaseTextualizePlugin):
+    name = TextualizePlugins.REPORTER
 
-class TextualizeReporter:
-    name = "pytest-textualize-reporter"
-
-    monitored_classes: ClassVar[list[str]] = []
-
-    def __init__(self, config: pytest.Config):
-        self.config = config
-        self.console: Console = config.stash.get(console_key, None)
-        self.settings: TextualizeSettings = config.stash.get(settings_key, None)
-        self._lock = threading.Lock()
+    def __init__(self):
+        self._path_highlighter = PathHighlighter()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name='{self.name}'>"
 
-    @property
-    def traceconfig(self) -> bool:
-        return self.config.option.traceconfig
-
-    @property
-    def verbosity(self) -> Verbosity:
-        verbose = self.config.option.verbose
-        return Verbosity(verbose)
-
-    @cached_property
-    def isatty(self) -> bool:
-        return sys.stdin.isatty()
 
     @pytest.hookimpl
     def pytest_configure(self, config: pytest.Config) -> None:
-        from pytest_textualize.settings import settings_key
-        from pytest_textualize.plugins.pytest_richtrace import console_key
+        from pytest_textualize import report_pytest_textualize_header
 
-        self.monitored_classes.append(self.name)
-        self.settings = config.stash.get(settings_key, None)
-        self.console = config.stash.get(console_key, None)
-        from pytest_textualize import __version__
+        super().configure(config)
 
-        panel = Panel(
-            Text(
-                "A pytest plugin using Rich for beautiful test result formatting.",  # noqa: E501
-                justify="center",
-            ),
-            box=box.ROUNDED,
-            style="pytest.panel.border",
-            padding=2,
-            title="[#4da8da]pytest-textualize plugin[/]",
-            subtitle=f"[#A9C46C]v{__version__}[/]",
-        )
-        self.console.print(panel)
-
-    @pytest.hookimpl
-    def pytest_addhooks(self, pluginmanager: pytest.PytestPluginManager) -> None:
-        from pytest_textualize.plugins.pytest_richtrace.hookspecs import ReportingHookSpecs
-
-        pluginmanager.add_hookspecs(ReportingHookSpecs)
-
-    @pytest.hookimpl(trylast=True)
-    def pytest_plugin_registered(self, plugin: PytestPlugin, plugin_name: str) -> None:
-        if plugin_name is None:
-            return None
-
-        if self.config.option.traceconfig:
-            tm = tracer_message("pytest_plugin_registered", info=plugin_name)
-            with self._lock:
-                tm(self.console)
-        elif plugin_name in self.monitored_classes:
-            tm = tracer_message("pytest_plugin_registered", info=plugin_name)
-            with self._lock:
-                tm(self.console)
-        return None
-
-    @pytest.hookimpl
-    def pytest_plugin_unregistered(self, plugin: PytestPlugin) -> None:
-        if self.verbosity > Verbosity.NORMAL:
-            if hasattr(plugin, "name"):
-                trm = tracer_message("pytest_plugin_unregistered", info=getattr(plugin, "name"))
-            else:
-                trm = tracer_message("pytest_plugin_unregistered", info=saferepr(plugin))
-            trm(self.console)
+        report_pytest_textualize_header(self.console)
 
     @pytest.hookimpl
     def pytest_make_collect_report(self, collector: pytest.Collector) -> None:
-        if self.verbosity < Verbosity.VERBOSE or collector.nodeid == "":
+        if self.verbosity <= Verbosity.VERBOSE or collector.nodeid == "":
             return
         if isinstance(collector, pytest.Session):
-            info = f"pytest.Session -> \"{collector.nodeid}\""
+            info = f'pytest.Session -> "{collector.nodeid}"'
         elif isinstance(collector, pytest.Directory):
-            info = f"pytest.Directory -> \"{collector.nodeid}\""
+            info = f'pytest.Directory -> "{collector.nodeid}"'
         elif isinstance(collector, pytest.File):
-            info = f"pytest.File -> \"{collector.nodeid}\""
+            info = f'pytest.File -> "{collector.nodeid}"'
         else:
             assert_never("unsupported collector")
-        hm = tracer_message("pytest_make_collect_report", info=info)
-        hm(self.console)
-
-
-
+        hook_msg("pytest_make_collect_report", info=info, console=self.console)
 
     @pytest.hookimpl
-    def pytest_collection_modifyitems(
-        self, session: pytest.Session, config: pytest.Config, items: list[pytest.Item]
-    ) -> None:
+    def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
         if self.verbosity > Verbosity.NORMAL:
-            trm = tracer_message("pytest_report_collection_modifyitems")
-            trm(self.console)
+            hook_msg("pytest_collection_modifyitems", console=self.console)
 
-            # self.console.print(f"{INDENT}[keyname]items[/]:")
-            item_text = "\n".join([f.name for f in items]).replace("[", "\\[")
-            if item_text:
-                pass
-
-            # self.console.print(indent(item_text, INDENT * 2))
-            # self.console.print()
-
-        return None
-
-    @pytest.hookimpl
-    def pytest_collectreport(self, report: pytest.CollectReport) -> None:
-        # if report.nodeid:
-        kv_msg = KeyValueMessage("nodeid", "report.nodeid")
-        kv_msg(self.console)
-        self.console.line()
-        table = Table(show_header=False, show_edge=False, show_lines=False)
-        table.add_column("name", style="pytest.keyname", width=15)
-        table.add_column("value", width=61)
-
-        table.add_row("outcome", f"[{report.outcome}]{report.outcome}[/]")
-
-        def strip_escape(data: bytes) -> bytes:
-            """Strip 7-bit and 8-bit C1 ANSI sequences
-            https://stackoverflow.com/a/14693789/3253026
-            """
-            import re
-            ansi_escape_8bit = re.compile(
-                rb"(?:\x1B[@-Z\\-_]|[\x80-\x9A\x9C-\x9F]|(?:\x1B\[|\x9B)[0-?]*[ -/]*[@-~])"
-            )
-            return ansi_escape_8bit.sub(b"", data)
-        def strip_escape_from_string(text: str) -> str:
-            return strip_escape(text.encode("utf-8")).decode("utf-8")
-
-        if report.caplog:
-            table.add_row(
-                "caplog",
-                strip_escape_from_string(report.caplog),
-            )
-
-        if report.capstderr:
-            table.add_row(
-                "capstderr",
-                strip_escape_from_string(report.capstderr),
-            )
-
-        if report.capstdout:
-            width = self.console.width - len("    ") * 3
-            stdout_text = "\n".join(
-                textwrap.wrap(
-                    Text.from_ansi(report.capstdout.strip(), style="none").plain,
-                    width=width,
-                    initial_indent="    " * 2,
-                    subsequent_indent="    " * 2,
+            # -- only on VER_VERBOSE
+            if self.verbosity > Verbosity.VERBOSE:
+                renderables: list[str] = []
+                for i, item in enumerate(items, start=1):
+                    renderables.append(f"[#97866A]{i}.[/]{escape(item.name)}")
+                self.console.print(
+                    Padding(
+                        Panel(
+                            Columns(renderables, column_first=True, expand=True),
+                            title="[#EAE4D5]collection_modifyitems",
+                            style="#D29F80",
+                            border_style="#735557",
+                            box=box.DOUBLE,
+                            padding=(1, 0, 0, 1),
+                        ),
+                        (0, 0, 0, 3),
+                    )
                 )
-            ).strip()
-            table.add_row("capstdout", stdout_text)
-
-        padding = Padding(table, (0, 0, 0, 4))
-        self.console.print(padding)
-
+        return None
 
     @pytest.hookimpl
     def pytest_itemcollected(self, item: pytest.Item) -> None:
         if self.verbosity < Verbosity.VERBOSE:
-            return
-        trm = tracer_message("pytest_itemcollected", info=item.nodeid)
-        trm(self.console)
-        kv_msg = KeyValueMessage( "nodeid", item.nodeid)
-        kv_msg(self.console)
+            return None
+
+        node_text = highlighted_nodeid(item)
+        hook_msg("pytest_itemcollected", info=node_text, console=self.console, highlight=True)
+
+        if self.verbosity > Verbosity.VERBOSE and hasattr(item, "callspec"):
+            import copy
+
+            deep_copied_dict = copy.deepcopy(item.callspec.__dict__)
+            r = keyval_msg(
+                "pytest.Item.callspec",
+                render_scope(
+                    dict(
+                        params=deep_copied_dict.get("params", {}),
+                        indices=deep_copied_dict.get("indices", {}),
+                        idlist=deep_copied_dict.get("_idlist", {}),
+                        marks=deep_copied_dict.get("marks", {}),
+                    ),
+                    title="callspec",
+                    sort_keys=True,
+                ),
+                value_style="scope.fill",
+                console=self.console,
+            )
+
         markers = list(item.iter_markers())
-
-        skip_markers = ", ".join(
-            [mark.name for mark in markers if mark.name.startswith("skip")]
-        )
-
-        xfail_markers = ", ".join(
-            [mark.name for mark in markers if mark.name.startswith("xfail")]
-        )
+        skip_markers = ", ".join([mark.name for mark in markers if mark.name.startswith("skip")])
+        xfail_markers = ", ".join([mark.name for mark in markers if mark.name.startswith("xfail")])
 
         from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
+
         if skip_markers or xfail_markers:
-            self.console.print("markers", style="bright_magenta")
+            # self.console.print("markers", style="bright_magenta")
             skipped = evaluate_skip_marks(item)
             if skipped is not None:
-                table = Table(
-                    show_header=False, show_edge=False, show_lines=False
+                renderables = key_value_scope(
+                    [
+                        ("type", "[skip]skip[/]"),
+                        ("reason", Text(skipped.reason)),
+                        ("marker", Text(f"@{skip_markers}", style="#B3AE60")),
+                    ]
                 )
-                table.add_column("name", style="pytest.keyname", width=15)
-                table.add_column("value", width=61)
-
-                table.add_row("type", "skip")
-                table.add_row("reason", skipped.reason)
-                table.add_row("marker", skip_markers)
-
-                padding = Padding(table, (0, 0, 0, 8))
-                self.console.print(padding)
+                self.console.print(renderables)
 
             xfailed = evaluate_xfail_marks(item)
             if xfailed is not None:
-                table = Table()
-                table = Table(
-                    show_header=False, show_edge=False, show_lines=False
-                )
-                table.add_column("name", style="pytest.keyname", width=15)
-                table.add_column("value", width=61)
-
-                table.add_row("type", "xfail")
-                table.add_row("reason", xfailed.reason)
+                xfail_list = [
+                    ("type", f"[xfail]xfail[/]"),
+                    ("reason", Text(xfailed.reason)),
+                    ("run", str(xfailed.run)),
+                    ("strict", str(xfailed.strict)),
+                ]
                 if xfailed.raises:
-                    table.add_row("raises", str(xfailed.raises))
-                table.add_row("run", str(xfailed.run))
-                table.add_row("strict", str(xfailed.strict))
-                table.add_row("marker", xfail_markers)
+                    xfail_list.append( ("raises", str(xfailed.raises)))
+                    xfail_list.append( ("marker", Text(f"@{skip_markers}", style="#B3AE60")))
 
-                padding = Padding(table, (0, 0, 0, 8))
-                self.console.print(padding)
+                renderables = key_value_scope(xfail_list)
+                self.console.print(renderables)
 
+        return None
 
     @pytest.hookimpl(trylast=True)
     def pytest_unconfigure(self) -> None:
         if self.verbosity > Verbosity.NORMAL:
-            trm = tracer_message("pytest_unconfigure")
-            trm(self.console)
+            hook_msg("pytest_unconfigure", console=self.console)
         self.config.pluginmanager.unregister(self, self.name)
 
     @pytest.hookimpl
@@ -300,7 +183,7 @@ class TextualizeReporter:
 
         chain_map = cast(ChainMap, data)
         for key_name in chain_map.fromkeys(
-                ["platform", "poetry_version", "pytest_version", "plugins", "packages"]
+            ["platform", "poetry_version", "pytest_version", "plugins", "packages"]
         ):
             if data.get(key_name) is None:
                 continue
@@ -379,8 +262,6 @@ class TextualizeReporter:
                 case _:
                     assert_never(key_name)
 
-        from rich.scope import render_scope
-
         table.add_row(
             "",
             render_scope(self.config.inicfg, title="[#4ED7F1]tool.pytest.ini_options[/]"),
@@ -417,8 +298,6 @@ def render_registered_plugins(title, dists: list[dict[str, str]], trace: bool) -
 
 
 def render_active_plugins(title, plugins: list[dict[str, str]]) -> ConsoleRenderable:
-    import textwrap
-    from rich.highlighter import ReprHighlighter
     from boltons.strutils import multi_replace
 
     table = _get_plugins_table(title)
@@ -475,13 +354,10 @@ def render_options_table(config: pytest.Config) -> ConsoleRenderable:
             return f'"{v}"'
         if isinstance(v, list):
             if key == "file_or_dir":
-                v = list(map(lambda x: Path(x).resolve().relative_to(config.rootpath).as_posix(), v))
-                return Pretty(
-                    v,
-                    overflow="fold",
-                    insert_line=True,
-                    highlighter=path_highlighter
+                v = list(
+                    map(lambda x: Path(x).resolve().relative_to(config.rootpath).as_posix(), v)
                 )
+                return Pretty(v, overflow="fold", insert_line=True, highlighter=path_highlighter)
             else:
                 return Pretty(v, overflow="fold", insert_line=True)
         else:

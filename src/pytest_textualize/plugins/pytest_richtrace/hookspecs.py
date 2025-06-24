@@ -1,6 +1,3 @@
-# Project : pytest-textualize
-# File Name : hookspecs.py
-# Dir Path : src/pytest_textualize/plugins/pytest_richtrace
 from __future__ import annotations
 
 from typing import Any
@@ -9,17 +6,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pytest_textualize import TextualizeSettings
 
 if TYPE_CHECKING:
     from rich.console import Console
-    from pytest_textualize.plugins import PytestPlugin
+    from pytest_textualize.plugins import PytestPluginType
+    from pytest_textualize.settings import TextualizeSettings
+    from rich.console import RenderableType
 
 
 @pytest.hookspec(historic=True)
-def pytest_console_and_settings(
-        console: Console, error_console: Console, settings: TextualizeSettings
-) -> None:
+def pytest_console_and_settings(console: Console, error_console: Console, settings: TextualizeSettings) -> None:
     """Provides the framework settings and the rich console,
 
     :param error_console: and sys. stderr console
@@ -27,6 +23,7 @@ def pytest_console_and_settings(
     :param settings: The configuration settings
     :return: a dictionary with the information collected
     """
+    pass
 
 
 @pytest.hookspec
@@ -40,15 +37,10 @@ def pytest_collect_env_info(config: pytest.Config) -> MutableMapping[str, Any] |
 
 
 @pytest.hookspec
-def pytest_plugin_unregistered(plugin: PytestPlugin) -> None:  # type:ignore[empty-body]
+def pytest_plugin_unregistered(plugin: PytestPluginType) -> None:  # type:ignore[empty-body]
     pass
 
 
-class ReportingHookSpecs:
-    @pytest.hookspec(firstresult=True)
-    def pytest_render_header(self, config: pytest.Config,
-                             data: MutableMapping[str, Any]) -> bool:  # type:ignore[empty-body]
-        pass
-
-    def pytest_report_collectreport(self, report: pytest.CollectReport) -> None:
-        pass
+@pytest.hookspec(firstresult=True)
+def pytest_render_header(config: pytest.Config, data: MutableMapping[str, Any]) -> bool:
+    pass
