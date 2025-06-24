@@ -1,172 +1,47 @@
+# Project : pytest-textualize
+# File Name : header_renderer.py
+# Dir Path : src/pytest_textualize/plugins/pytest_richtrace/services
 from __future__ import annotations
 
 import textwrap
 from pathlib import Path
 from pprint import saferepr
 from typing import Any
+from typing import TYPE_CHECKING
+from typing import assert_never
 from typing import cast
 
 import pytest
-from rich import box
+from collections import ChainMap
+
 from rich.columns import Columns
-from rich.console import render_scope
-from rich.markup import escape
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.pretty import Pretty
+from rich.scope import render_scope
 from rich.table import Table
-from rich.text import Text
+from rich import box
 from rich.traceback import PathHighlighter
-from typing_extensions import TYPE_CHECKING
-from typing_extensions import assert_never
+
+from pytest_textualize import ArgparseArgsHighlighter
+from rich.text import Text
 
 from pytest_textualize import TextualizePlugins
-from pytest_textualize import highlighted_nodeid
-from pytest_textualize import hook_msg
-from pytest_textualize import key_value_scope
-from pytest_textualize import keyval_msg
-from pytest_textualize.plugins.pytest_richtrace.base import BaseTextualizePlugin
-from pytest_textualize.settings import Verbosity
+from pytest_textualize.plugin.base import BaseTextualizePlugin
 
 if TYPE_CHECKING:
-    from typing import MutableMapping
+    from collections.abc import MutableMapping
     from rich.console import ConsoleRenderable
 
 
-class TextualizeReporter(BaseTextualizePlugin):
-    name = TextualizePlugins.REPORTER
-
-    def __init__(self):
-        self._path_highlighter = PathHighlighter()
-
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} name='{self.name}'>"
-
-
-    @pytest.hookimpl
-    def pytest_configure(self, config: pytest.Config) -> None:
-        from pytest_textualize import report_pytest_textualize_header
-
-        super().configure(config)
-
-        report_pytest_textualize_header(self.console)
-
-    @pytest.hookimpl
-    def pytest_make_collect_report(self, collector: pytest.Collector) -> None:
-        if self.verbosity <= Verbosity.VERBOSE or collector.nodeid == "":
-            return
-        if isinstance(collector, pytest.Session):
-            info = f'pytest.Session -> "{collector.nodeid}"'
-        elif isinstance(collector, pytest.Directory):
-            info = f'pytest.Directory -> "{collector.nodeid}"'
-        elif isinstance(collector, pytest.File):
-            info = f'pytest.File -> "{collector.nodeid}"'
-        else:
-            assert_never("unsupported collector")
-        hook_msg("pytest_make_collect_report", info=info, console=self.console)
-
-    @pytest.hookimpl
-    def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
-        if self.verbosity > Verbosity.NORMAL:
-            hook_msg("pytest_collection_modifyitems", console=self.console)
-
-            # -- only on VER_VERBOSE
-            if self.verbosity > Verbosity.VERBOSE:
-                renderables: list[str] = []
-                for i, item in enumerate(items, start=1):
-                    renderables.append(f"[#97866A]{i}.[/]{escape(item.name)}")
-                self.console.print(
-                    Padding(
-                        Panel(
-                            Columns(renderables, column_first=True, expand=True),
-                            title="[#EAE4D5]collection_modifyitems",
-                            style="#D29F80",
-                            border_style="#735557",
-                            box=box.DOUBLE,
-                            padding=(1, 0, 0, 1),
-                        ),
-                        (0, 0, 0, 3),
-                    )
-                )
-        return None
-
-    @pytest.hookimpl
-    def pytest_itemcollected(self, item: pytest.Item) -> None:
-        if self.verbosity < Verbosity.VERBOSE:
-            return None
-
-        node_text = highlighted_nodeid(item)
-        hook_msg("pytest_itemcollected", info=node_text, console=self.console, highlight=True)
-
-        if self.verbosity > Verbosity.VERBOSE and hasattr(item, "callspec"):
-            import copy
-
-            deep_copied_dict = copy.deepcopy(item.callspec.__dict__)
-            r = keyval_msg(
-                "pytest.Item.callspec",
-                render_scope(
-                    dict(
-                        params=deep_copied_dict.get("params", {}),
-                        indices=deep_copied_dict.get("indices", {}),
-                        idlist=deep_copied_dict.get("_idlist", {}),
-                        marks=deep_copied_dict.get("marks", {}),
-                    ),
-                    title="callspec",
-                    sort_keys=True,
-                ),
-                value_style="scope.fill",
-                console=self.console,
-            )
-
-        markers = list(item.iter_markers())
-        skip_markers = ", ".join([mark.name for mark in markers if mark.name.startswith("skip")])
-        xfail_markers = ", ".join([mark.name for mark in markers if mark.name.startswith("xfail")])
-
-        from _pytest.skipping import evaluate_skip_marks, evaluate_xfail_marks
-
-        if skip_markers or xfail_markers:
-            # self.console.print("markers", style="bright_magenta")
-            skipped = evaluate_skip_marks(item)
-            if skipped is not None:
-                renderables = key_value_scope(
-                    [
-                        ("type", "[skip]skip[/]"),
-                        ("reason", Text(skipped.reason)),
-                        ("marker", Text(f"@{skip_markers}", style="#B3AE60")),
-                    ]
-                )
-                self.console.print(renderables)
-
-            xfailed = evaluate_xfail_marks(item)
-            if xfailed is not None:
-                xfail_list = [
-                    ("type", f"[xfail]xfail[/]"),
-                    ("reason", Text(xfailed.reason)),
-                    ("run", str(xfailed.run)),
-                    ("strict", str(xfailed.strict)),
-                ]
-                if xfailed.raises:
-                    xfail_list.append( ("raises", str(xfailed.raises)))
-                    xfail_list.append( ("marker", Text(f"@{skip_markers}", style="#B3AE60")))
-
-                renderables = key_value_scope(xfail_list)
-                self.console.print(renderables)
-
-        return None
-
-    @pytest.hookimpl(trylast=True)
-    def pytest_unconfigure(self) -> None:
-        if self.verbosity > Verbosity.NORMAL:
-            hook_msg("pytest_unconfigure", console=self.console)
-        self.config.pluginmanager.unregister(self, self.name)
-
+class HeaderRenderer(BaseTextualizePlugin):
+    
+    name = TextualizePlugins.HEADER_RENDERER_SERVICE
+    
     @pytest.hookimpl
     def pytest_render_header(self, config: pytest.Config, data: MutableMapping[str, Any]) -> bool:
-        from collections import ChainMap
-        from pytest_textualize.textualize.theme.highlighters import ArgparseArgsHighlighter
-        from rich.text import Text
-
-        arg_h = ArgparseArgsHighlighter()
+        argparse_h = ArgparseArgsHighlighter()
+        path_h = PathHighlighter()
 
         table = Table(
             box=box.HORIZONTALS,
@@ -174,7 +49,7 @@ class TextualizeReporter(BaseTextualizePlugin):
             border_style="pytest.table.border",
             expand=True,
         )
-
+        
         table.add_column(width=25, justify="left", style="pytest.keyname", max_width=25)
 
         words = lambda x: str(x).replace("_", " ")
@@ -182,8 +57,9 @@ class TextualizeReporter(BaseTextualizePlugin):
         getval = lambda x, y: x.get(y, None)
 
         chain_map = cast(ChainMap, data)
+
         for key_name in chain_map.fromkeys(
-            ["platform", "poetry_version", "pytest_version", "plugins", "packages"]
+                ["platform", "poetry_version", "pytest_version", "plugins", "packages"]
         ):
             if data.get(key_name) is None:
                 continue
@@ -202,7 +78,7 @@ class TextualizeReporter(BaseTextualizePlugin):
                     )
                     table.add_row(
                         title("python_executable"),
-                        path_highlighter(Text(getval(data, "python_executable"))),
+                        path_h(Text(getval(data, "python_executable"))),
                         end_section=True,
                     )
                     if getval(data, "pypy_version") is not None:
@@ -229,13 +105,13 @@ class TextualizeReporter(BaseTextualizePlugin):
 
                 case "pytest_version":
                     table.add_row(title(key_name), Text(data.get(key_name), style="pytest.version"))
-                    table.add_row("rootdir", path_highlighter(getval(data, "rootdir")))
-                    table.add_row("configfile", path_highlighter(getval(data, "configfile")))
+                    table.add_row("rootdir", path_h(getval(data, "rootdir")))
+                    table.add_row("configfile", path_h(getval(data, "configfile")))
                     if getval(data, "cachedir") is not None:
-                        table.add_row("cachedir", path_highlighter(getval(data, "cachedir")))
+                        table.add_row("cachedir", path_h(getval(data, "cachedir")))
                     table.add_row(
                         title("invocation_params"),
-                        arg_h(Text(data.get("invocation_params"))),
+                        argparse_h(Text(data.get("invocation_params"))),
                     )
 
                 case "plugins":
@@ -255,25 +131,27 @@ class TextualizeReporter(BaseTextualizePlugin):
                         table.add_row(col_name, renderable)
                     if self.traceconfig:
                         renderable = render_active_plugins(
-                            plugins["name_title"], plugins.get("names_info")
+                            plugins["name_title"], plugin.get("names_info")
                         )
                         table.add_row("", renderable)
 
                 case _:
                     assert_never(key_name)
 
-        table.add_row(
-            "",
-            render_scope(self.config.inicfg, title="[#4ED7F1]tool.pytest.ini_options[/]"),
-            end_section=False,
-        )
-        table.add_row("", render_options_table(config), end_section=False)
-        self.console.print(Padding(table, (0, 0, 0, 2)))
-        self.console.line(2)
+            table.add_row(
+                "",
+                render_scope(self.config.inicfg, title="[#4ED7F1]tool.pytest.ini_options[/]"),
+                end_section=False,
+            )
+            table.add_row("", render_options_table(config), end_section=False)
+            self.console.print(Padding(table, (0, 0, 0, 2)))
+            self.console.line(2)
         return True
-
-
+       
+        
 def render_registered_plugins(title, dists: list[dict[str, str]], trace: bool) -> ConsoleRenderable:
+    path_highlighter = PathHighlighter()
+    
     if trace:
         table = _get_plugins_table(title)
         for d in dists:
@@ -299,6 +177,7 @@ def render_registered_plugins(title, dists: list[dict[str, str]], trace: bool) -
 
 def render_active_plugins(title, plugins: list[dict[str, str]]) -> ConsoleRenderable:
     from boltons.strutils import multi_replace
+    path_highlighter = PathHighlighter()
 
     table = _get_plugins_table(title)
     for plugin in plugins:
@@ -330,6 +209,7 @@ def render_packages(packages: list[dict[str, str]]) -> ConsoleRenderable:
 
 def render_options_table(config: pytest.Config) -> ConsoleRenderable:
     from itertools import batched
+    path_highlighter = PathHighlighter()
 
     table = Table(
         box=box.DOUBLE_EDGE,

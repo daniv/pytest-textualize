@@ -9,21 +9,25 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic_extra_types.pendulum_dt import DateTime
 
+from .services import *
+
 from pytest_textualize import TextualizePlugins
 from pytest_textualize import stage_rule
-from pytest_textualize.plugins.pytest_richtrace.base import BaseTextualizePlugin
+from pytest_textualize.plugin.base import BaseTextualizePlugin
 from pytest_textualize.settings import Verbosity
+from .services.header_data_collector import HeaderServiceManager
+from .services.plugin_registration import TextualizePluginRegistrationService
 
 if TYPE_CHECKING:
-    from pytest_textualize.plugins import PytestPluginType
-    from pytest_textualize.plugins import TestRunResults
+    from pytest_textualize.plugin import PytestPluginType
+    from pytest_textualize.plugin import TestRunResults
 
 
 class TextualizeTracer(BaseTextualizePlugin):
     name: str = TextualizePlugins.TRACER
 
     def __init__(self) -> None:
-        from pytest_textualize.plugins import TestRunResults
+        from pytest_textualize.plugin import TestRunResults
 
         self.pluginmanager: pytest.PytestPluginManager | None = None
         self.results = TestRunResults()
@@ -52,14 +56,13 @@ class TextualizeTracer(BaseTextualizePlugin):
 
     @pytest.hookimpl(tryfirst=True)
     def pytest_configure(self, config: pytest.Config) -> None:
-        from pytest_textualize.plugins import TextualizeReporter
-        from pytest_textualize.plugins import ErrorExecutionTracer
+        from pytest_textualize.plugin import TextualizeReporter
+        from pytest_textualize.plugin import ErrorExecutionTracer
 
         super().configure(config)
         self.pluginmanager = config.pluginmanager
 
         if self.verbosity > Verbosity.NORMAL or self.traceconfig:
-            from pytest_textualize.plugins import TextualizePluginRegistrationService
             service = TextualizePluginRegistrationService()
             service.monitored_classes.extend(
                 [
@@ -88,8 +91,7 @@ class TextualizeTracer(BaseTextualizePlugin):
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionstart(self, session: pytest.Session) -> None:
-        from pytest_textualize.plugins import CollectorTracer
-        from pytest_textualize.plugins import HeaderServiceManager
+        from pytest_textualize.plugin import CollectorTracer
 
         self.results.precise_start = time.perf_counter()
         self.results.start = DateTime.now()
@@ -111,11 +113,14 @@ class TextualizeTracer(BaseTextualizePlugin):
             manager.call(session.config)
             environment_data = hook.pytest_collect_env_info(config=session.config)
             manager.teardown(session.config)
+            
+            
+            self.pluginmanager.register(collection_tracer, name=collection_tracer.name)
             hook.pytest_render_header(config=session.config, data=environment_data)
 
     @pytest.hookimpl
     def pytest_collection_finish(self, session: pytest.Session) -> None:
-        from pytest_textualize.plugins import RunTestTracer
+        from pytest_textualize.plugin import RunTestTracer
 
         if self.pluginmanager.has_plugin(TextualizePlugins.REGISTRATION_SERVICE):
             registration_service = self.pluginmanager.getplugin(TextualizePlugins.REGISTRATION_SERVICE)

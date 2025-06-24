@@ -5,12 +5,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pytest_textualize import TextualizePlugins
-from pytest_textualize.plugins.pytest_richtrace.base import BaseTextualizePlugin
+from pytest_textualize.plugin.base import BaseTextualizePlugin
 
 if TYPE_CHECKING:
-    from rich.console import Console
-    from pytest_textualize.settings import TextualizeSettings
-    from pytest_textualize.plugins import TestRunResults
+    from pytest_textualize.plugin import TestRunResults
 
 
 class RunTestTracer(BaseTextualizePlugin):

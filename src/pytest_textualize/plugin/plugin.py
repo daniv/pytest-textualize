@@ -16,6 +16,7 @@ from pytest_textualize import TextualizePlugins
 from pytest_textualize import Verbosity
 from pytest_textualize import console_factory
 from pytest_textualize import get_bool_opt
+
 from pytest_textualize.settings import TextualizeSettings
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ PLUGIN_NAME = TextualizePlugins.PLUGIN
 
 @pytest.hookimpl
 def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:
-    from pytest_textualize.plugins.pytest_richtrace import hookspecs
+    from pytest_textualize.plugin import hookspecs
     pluginmanager.add_hookspecs(hookspecs)
 
 
@@ -51,10 +52,10 @@ def pytest_addoption(parser: pytest.Parser, pluginmanager: pytest.PytestPluginMa
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: pytest.Config) -> None:
-    from pytest_textualize.plugins.pytest_richtrace import console_key
-    from pytest_textualize.plugins.pytest_richtrace import error_console_key
-    from pytest_textualize.plugins.pytest_richtrace import settings_key
-    from .base import BaseTextualizePlugin
+    from pytest_textualize.plugin import console_key
+    from pytest_textualize.plugin import error_console_key
+    from pytest_textualize.plugin import settings_key
+    from pytest_textualize.plugin.base import BaseTextualizePlugin
 
     # -- validates that the plugin option was set to true
     if not config.getoption("--textualize", False, skip=True):
@@ -106,7 +107,7 @@ def pytest_configure(config: pytest.Config) -> None:
     configure_logging(_stream_console, _settings)
 
     # -- registering the main tracer plugin class
-    from pytest_textualize.plugins import TextualizeTracer
+    from pytest_textualize.plugin import TextualizeTracer
     tracer = TextualizeTracer()
     config.pluginmanager.register(tracer, TextualizeTracer.name)
 
@@ -149,6 +150,7 @@ def textualize_option(pytestconfig: pytest.Config) -> bool:
 @pytest.fixture(scope="session", autouse=False, name="settings")
 def settings(pytestconfig: pytest.Config, textualize_option: bool) -> TextualizeSettings | None:
     if textualize_option:
+        from pytest_textualize.plugin import settings_key
         return pytestconfig.stash.get(settings_key, None)
     return None
 

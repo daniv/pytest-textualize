@@ -11,9 +11,9 @@ import pytest
 from rich.console import Console
 
 
-from pytest_textualize.plugins.pytest_richtrace import console_key
-from pytest_textualize.plugins.pytest_richtrace import error_console_key
-from pytest_textualize.plugins.pytest_richtrace import settings_key
+from pytest_textualize.plugin import console_key
+from pytest_textualize.plugin import error_console_key
+from pytest_textualize.plugin import settings_key
 from pytest_textualize.textualize.logging import TextualizeConsoleLogRender
 
 if TYPE_CHECKING:

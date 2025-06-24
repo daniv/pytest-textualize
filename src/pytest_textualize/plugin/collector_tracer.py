@@ -22,7 +22,7 @@ from pytest_textualize import TextualizePlugins
 from pytest_textualize import Verbosity
 from pytest_textualize import hook_msg
 from pytest_textualize import stage_rule
-from pytest_textualize.plugins.pytest_richtrace.base import BaseTextualizePlugin
+from pytest_textualize.plugin.base import BaseTextualizePlugin
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from rich.console import Console
     from _pytest.compat import LEGACY_PATH
-    from pytest_textualize.plugins import TestRunResults
+    from pytest_textualize.plugin import TestRunResults
     from pytest_textualize.settings import TextualizeSettings
     from rich.console import RenderableType
 
@@ -168,7 +168,7 @@ class CollectorTracer(BaseTextualizePlugin):
 
     @pytest.hookimpl
     def pytest_itemcollected(self, item: pytest.Item) -> None:
-        from pytest_textualize.plugins.pytest_richtrace.model import SkipInfo, XfailInfo, NodeId
+        from pytest_textualize.plugin.model import SkipInfo, XfailInfo, NodeId
         from _pytest.skipping import evaluate_xfail_marks, evaluate_skip_marks
 
         self.collect.stats.total_collected += 1
@@ -230,8 +230,8 @@ class CollectorTracer(BaseTextualizePlugin):
             # ---> collect rt reerror    self.test_run_results.collect.error[str(module_path)] = exc
         #     import traceback
         #     tf = traceback.extract_tb(exc.__traceback__)[-1]
-        #     from pytest_textualize.plugins.pytest_richtrace.exceptions import ConsoleMessage
-        #     # from pytest_textualize.plugins.pytest_richtrace.exceptions import PytestTextualizeRuntimeError
+        #     from pytest_textualize.plugin.pytest_richtrace.exceptions import ConsoleMessage
+        #     # from pytest_textualize.plugin.pytest_richtrace.exceptions import PytestTextualizeRuntimeError
         #     from rich.text import Text
         #     from rich.containers import Lines, Renderables
         #
@@ -310,7 +310,7 @@ class CollectorTracer(BaseTextualizePlugin):
 
         if self.config.getoption("collectonly"):
             if session.items:
-                from pytest_textualize.plugins import collect_only_helper
+                from pytest_textualize.plugin import collect_only_helper
 
                 renderable = collect_only_helper(session, 0)
                 self.console.print(Padding(renderable, (0, 0, 0, 3)), crop=False, overflow="ignore")

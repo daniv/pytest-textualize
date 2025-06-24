@@ -34,7 +34,7 @@ def pytest_addoption(parser: pytest.Parser, pluginmanager: pytest.PytestPluginMa
         default=True,
         help="Do not print console outputs during tests.",
     )
-    from pytest_textualize.plugins import textualize_plugin
+    from pytest_textualize.plugin import textualize_plugin
     pluginmanager.register(textualize_plugin, textualize_plugin.PLUGIN_NAME)
 
 

@@ -19,14 +19,14 @@ from pytest_textualize import Verbosity
 from pytest_textualize.settings import TextualizeSettings
 
 if TYPE_CHECKING:
-    from pytest_textualize.plugins import PytestPluginType
+    from pytest_textualize.plugin import PytestPluginType
 
 
 class _BaseTextualizeSettingsPlugin(ABC):
     settings: TextualizeSettings | None = None
 
     def configure(self, config: pytest.Config) -> None:
-        from pytest_textualize.plugins.pytest_richtrace import settings_key
+        from pytest_textualize.plugin import settings_key
 
         settings = config.stash.get(settings_key, None)
         self.settings = self.validate_settings(settings)
@@ -35,11 +35,12 @@ class _BaseTextualizeSettingsPlugin(ABC):
     def validate_settings(cls, settings: TextualizeSettings) -> TextualizeSettings | NoReturn:
         return TypeAdapter(TextualizeSettings).validate_python(settings)
 
+
 class _BaseRichConsolePlugin(_BaseTextualizeSettingsPlugin, ABC):
     console: Console | None = None
 
     def configure(self, config: pytest.Config) -> None:
-        from pytest_textualize.plugins.pytest_richtrace import console_key
+        from pytest_textualize.plugin import console_key
 
         super().configure(config)
         console = config.stash.get(console_key, None)
@@ -85,5 +86,5 @@ class BaseTextualizePlugin(_BaseRichConsolePlugin):
         return sys.stdout.isatty()
 
     def cleanup_factory(self, plugin: PytestPluginType) -> None:
-        from pytest_textualize.plugins import cleanup_factory
+        from pytest_textualize.plugin import cleanup_factory
         self.config.add_cleanup(cleanup_factory(self.config.pluginmanager, plugin))

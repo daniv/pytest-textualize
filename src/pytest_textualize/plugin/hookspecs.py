@@ -9,7 +9,7 @@ import pytest
 
 if TYPE_CHECKING:
     from rich.console import Console
-    from pytest_textualize.plugins import PytestPluginType
+    from pytest_textualize.plugin import PytestPluginType
     from pytest_textualize.settings import TextualizeSettings
     from rich.console import RenderableType
 

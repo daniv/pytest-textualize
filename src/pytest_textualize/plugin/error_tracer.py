@@ -10,15 +10,11 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pytest_textualize import TextualizePlugins
-from pytest_textualize.plugins.pytest_richtrace import console_key
-from pytest_textualize.plugins.pytest_richtrace import error_console_key
-from pytest_textualize.plugins.pytest_richtrace import settings_key
-from pytest_textualize.plugins.pytest_richtrace.base import BaseTextualizePlugin
+from pytest_textualize.plugin.base import BaseTextualizePlugin
 
 if TYPE_CHECKING:
     from rich.console import Console
     from pytest_textualize.settings import TextualizeSettings
-    from pytest_textualize.plugins import TestRunResults
 
 
 class ErrorExecutionTracer(BaseTextualizePlugin):

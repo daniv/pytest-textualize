@@ -12,11 +12,10 @@ import pytest
 from pytest_textualize import TextualizePlugins
 from pytest_textualize import Verbosity
 from pytest_textualize import hook_msg
-from pytest_textualize.plugins.pytest_richtrace.base import BaseTextualizePlugin
+from pytest_textualize.plugin.base import BaseTextualizePlugin
 
 if TYPE_CHECKING:
-    from pytest_textualize.plugins import PytestPluginType
-    from rich.console import Console
+    from pytest_textualize.plugin import PytestPluginType
 
 
 class TextualizePluginRegistrationService(BaseTextualizePlugin):

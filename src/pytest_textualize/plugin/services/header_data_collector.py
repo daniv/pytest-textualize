@@ -25,7 +25,7 @@ to_kebab_case = lambda s: s.lower().replace(" ", "_")
 
 
 class PytestCollectorService:
-    name = "pytest-collector-service"
+    name = TextualizePlugins.PYTEST_COLLECTOR_SERVICE
 
     @pytest.hookimpl(tryfirst=True)
     def pytest_collect_env_info(self, config: pytest.Config) -> dict[str, str]:
@@ -41,7 +41,7 @@ class PytestCollectorService:
 
 
 class PluggyCollectorService:
-    name = "pluggy-collector-service"
+    name = TextualizePlugins.PLUGGY_COLLECTOR_SERVICE
 
     def __init__(self) -> None:
         self.config: pytest.Config | None = None
@@ -142,7 +142,7 @@ class PluggyCollectorService:
 
 
 class PoetryCollectorService:
-    name = "poetry-collector-service"
+    name = TextualizePlugins.POETRY_COLLECTOR_SERVICE
 
     @pytest.hookimpl(trylast=True)
     def pytest_collect_env_info(self, config: pytest.Config) -> dict[str, Any] | None:
@@ -191,7 +191,7 @@ class PoetryCollectorService:
 
 
 class PythonCollectorService:
-    name = "python-collector-service"
+    name = TextualizePlugins.PYTHON_COLLECTOR_SERVICE
 
     @pytest.hookimpl(tryfirst=True)
     def pytest_collect_env_info(self, config: pytest.Config) -> dict[str, Any]:
@@ -225,7 +225,7 @@ class PythonCollectorService:
 
 
 class HookHeaderCollectorService:
-    name = "hook-header-collector-service"
+    name = TextualizePlugins.HOOKS_COLLECTOR_SERVICE
 
     @pytest.hookimpl(trylast=True)
     def pytest_collect_env_info(self, config) -> dict[str, Any]:
@@ -256,7 +256,7 @@ class HookHeaderCollectorService:
 
 
 class CollectorWrapper:
-    name = "collector-wrapper"
+    name = TextualizePlugins.COLLECTOR_WRAPPER
 
     @pytest.hookimpl(wrapper=True)
     def pytest_collect_env_info(self) -> Generator[None, dict, MutableMapping[str, Any]]:

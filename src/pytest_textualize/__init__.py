@@ -33,8 +33,8 @@ from pytest_textualize.textualize.console import key_value_scope
 from pytest_textualize.textualize.theme.highlighters import ArgparseArgsHighlighter
 from pytest_textualize.textualize.theme.highlighters import NodeItemHighlighter
 from pytest_textualize.textualize.theme.syntax import RichTextualizeSyntaxTheme
-# from pytest_textualize.plugins.pytest_richtrace.exceptions import PytestTextualizeRuntimeError
-# from pytest_textualize.plugins.pytest_richtrace.exceptions import ConsoleMessage
+# from pytest_textualize.plugin.pytest_richtrace.exceptions import PytestTextualizeRuntimeError
+# from pytest_textualize.plugin.pytest_richtrace.exceptions import ConsoleMessage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -55,6 +55,13 @@ class TextualizePlugins(StrEnum):
     RUNTEST_TRACER = "textualize-runtest-tracer"
     REGISTRATION_SERVICE = "textualize-registration-service"
     REPORTER = "textualize-reporter"
+    PLUGGY_COLLECTOR_SERVICE = "pluggy-collector-service"
+    PYTEST_COLLECTOR_SERVICE = "pytest-collector-service"
+    POETRY_COLLECTOR_SERVICE = "poetry-collector-service"
+    PYTHON_COLLECTOR_SERVICE = "python-collector-service"
+    HOOKS_COLLECTOR_SERVICE = "hooks-collector-service"
+    COLLECTOR_WRAPPER = "collector-wrapper"
+    HEADER_RENDERER_SERVICE = "header-renderer-wrapper"
 
 
 
