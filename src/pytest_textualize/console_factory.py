@@ -10,8 +10,10 @@ from typing import TYPE_CHECKING
 import pytest
 from rich.console import Console
 
-from pytest_textualize.plugins.pytest_richtrace import console_key
-from pytest_textualize.plugins.pytest_richtrace import error_console_key
+
+from pytest_textualize.plugin import console_key
+from pytest_textualize.plugin import error_console_key
+from pytest_textualize.plugin import settings_key
 from pytest_textualize.textualize.logging import TextualizeConsoleLogRender
 
 if TYPE_CHECKING:
@@ -21,7 +23,6 @@ if TYPE_CHECKING:
 class ConsoleFactory:
     @staticmethod
     def check_settings(config: pytest.Config) -> ConsolePyProjectSettingsModel:
-        from pytest_textualize.settings import settings_key
 
         textualize_settings = config.stash.get(settings_key, None)
         assert textualize_settings, "No settings found"
@@ -29,7 +30,8 @@ class ConsoleFactory:
         return textualize_settings.console
 
     @staticmethod
-    def console_null_output(config: pytest.Config) -> Console:
+    def console_null(config: pytest.Config) -> Console:
+        # noinspection PyProtectedMember
         from rich._null_file import NullFile
 
         null_console = Console(file=NullFile(), stderr=False)
@@ -37,14 +39,15 @@ class ConsoleFactory:
         return null_console
 
     @staticmethod
-    def console_error_output(config: pytest.Config) -> Console:
-        return ConsoleFactory.console_output(config, stderr=True)
+    def console_stderr(config: pytest.Config) -> Console:
+        return ConsoleFactory.console_stdout(config, stderr=True)
 
     @staticmethod
-    def console_output(config: pytest.Config, stderr: bool = False) -> Console:
+    def console_stdout(config: pytest.Config, stderr: bool = False) -> Console:
         console_settings = ConsoleFactory.check_settings(config)
         console = (
-            config.stash.get(error_console_key, None) if stderr
+            config.stash.get(error_console_key, None)
+            if stderr
             else config.stash.get(console_key, None)
         )
         if console is None:
@@ -59,7 +62,11 @@ class ConsoleFactory:
             theme = console_settings.get_theme(console_settings.color_system)
             if stderr:
                 console = Console(
-                    stderr=True, style="red", force_interactive=False, theme=theme, **exclude_none_unset
+                    stderr=True,
+                    style="red",
+                    force_interactive=False,
+                    theme=theme,
+                    **exclude_none_unset,
                 )
             else:
                 console = Console(stderr=False, theme=theme, **exclude_none_unset)
@@ -67,6 +74,15 @@ class ConsoleFactory:
             config.stash.setdefault(console_key, console)
 
         return console
+
+    @staticmethod
+    def console_buffer(config: pytest.Config) -> Console:
+        """
+        This console does not require to be in stash since he works with strings
+        """
+        console_settings = ConsoleFactory.check_settings(config)
+        exclude_none = console_settings.model_dump(exclude_none=True)
+        return Console(file=StringIO(), stderr=False, **exclude_none)
 
     @staticmethod
     def redirect_log_render(console: Console) -> Console:
@@ -77,12 +93,3 @@ class ConsoleFactory:
             time_format=render.time_format,
         )
         return console
-
-    @staticmethod
-    def console_buffered_output(config: pytest.Config) -> Console:
-        """
-        This console does not require to be in stash since he works with strings
-        """
-        console_settings = ConsoleFactory.check_settings(config)
-        exclude_none = console_settings.model_dump(exclude_none=True)
-        return Console(file=StringIO(), stderr=False, **exclude_none)

@@ -74,7 +74,6 @@ class XfailInfo(BaseModel):
         return ", ".join([str(exc.__name__) for exc in excs])
 
 
-
 @auto
 class Timings(BaseModel):
     model_config = ConfigDict(
@@ -163,17 +162,27 @@ class Timings(BaseModel):
             return ""
         return self.start.to_time_string()
 
+class CollectStats(BaseModel):
+    total_errors: int = Field(default=0, alias="errors")
+    total_skipped: int = Field(default=0, alias="skipped")
+    total_xfailed: int = Field(default=0, alias="xfailed")
+    total_deselected: int = Field(default=0, alias="deselected")
+    total_collected: int = Field(default=0, alias="collected")
+    total_ignored_collected: int = Field(default=0, alias="ignored")
+
+    @property
+    def selected(self) -> int:
+        sub_total = sum([self.total_deselected, self.total_skipped, self.total_xfailed, self.total_errors])
+        return self.total_collected - sub_total
 
 @auto
 class TestCollectionRecord(Timings):
     count: int = 0
     error: dict[ModuleId, BaseException] = Field(default_factory=dict)
-    files_collected: int = 0
-    directories_collected: int = 0
-    ignored_collected: int = 0
     skip: dict[NodeId, list[SkipInfo]] = Field(default_factory=dict)
     xfail: dict[NodeId, list[XfailInfo]] = Field(default_factory=dict)
     deselected: list[NodeId] = Field(default_factory=list)
+    stats: CollectStats = Field(default_factory=CollectStats)
 
     @property
     def errors_count(self) -> int:
@@ -188,15 +197,15 @@ class TestCollectionRecord(Timings):
 
     @field_serializer("error")
     def serialize_exception(
-            self, exc_info: dict[ModuleId, BaseException], _info
+        self, exc_info: dict[ModuleId, BaseException], _info
     ) -> dict[ModuleId, str]:
         def format_exc(exc: BaseException) -> str:
             import traceback
+
             return "".join(traceback.format_exception_only(type(exc), exc)).rstrip("\n")
 
         return {k: format_exc(exc) for k, exc in exc_info.items()}
 
 
 class TestRunResults(Timings):
-    durations: dict[str, float] = Field(default_factory=dict)
     collect: TestCollectionRecord = Field(default_factory=TestCollectionRecord)

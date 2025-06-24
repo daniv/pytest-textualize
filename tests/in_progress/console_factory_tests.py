@@ -16,11 +16,9 @@ from hamcrest import instance_of
 from hamcrest import none
 from hamcrest import not_none
 
-from pytest_textualize import ConsoleFactory
-from pytest_textualize import TextualizeSettings
-from pytest_textualize.plugins.pytest_richtrace import console_key
-from pytest_textualize.plugins.pytest_richtrace import error_console_key
-from pytest_textualize.settings import settings_key
+from pytest_textualize.settings import TextualizeSettings
+from pytest_textualize.plugin.pytest_richtrace import console_key
+from pytest_textualize.plugin.pytest_richtrace import error_console_key
 
 if TYPE_CHECKING:
     pass

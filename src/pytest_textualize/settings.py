@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from rich.syntax import ANSISyntaxTheme
     from rich.syntax import SyntaxTheme
     from rich.theme import Theme
+
     # noinspection PyProtectedMember
     from pydantic.fields import FieldInfo
 
@@ -37,9 +38,9 @@ EmojiVariant = Literal["emoji", "text"]
 ColorSystemVariant = Literal["auto", "standard", "256", "truecolor", "windows"]
 
 STYLE_INI_FILES: Mapping[str, Path] = {
-    "truecolor": Path("static/styles") / "truecolor_styles.ini",
-    "standard": Path("static/styles") / "standard_styles.ini",
-    "eight_bit": Path("static/styles") / "eight_bit_styles.ini",
+    "truecolor": Path("static/styles") / "truecolor_styles.cfg",
+    "standard": Path("static/styles") / "standard_styles.cfg",
+    "eight_bit": Path("static/styles") / "eight_bit_styles.cfg",
 }
 
 
@@ -165,7 +166,6 @@ class ConsolePyProjectSettingsModel(BaseModel):
         return theme
 
 
-
 class TracebacksAbstractModel(BaseModel, ABC):
     locals_max_string: int = Field(
         default=80, description="Maximum length of string before truncating.", ge=20
@@ -174,7 +174,6 @@ class TracebacksAbstractModel(BaseModel, ABC):
     locals_max_length: int = Field(
         default=10, description="Maximum length of containers before abbreviating.", ge=1, le=20
     )
-
 
 
 class TracebacksPyProjectSettingsModel(TracebacksAbstractModel):
@@ -212,7 +211,10 @@ class TracebacksPyProjectSettingsModel(TracebacksAbstractModel):
     )
     indent_guides: bool = Field(True, description="Enable indent guides in code and locals.")
     suppress: Iterable[str] = (
-        Field(default=(), description="Optional sequence of modules or paths to exclude from traceback."),
+        Field(
+            default=(),
+            description="Optional sequence of modules or paths to exclude from traceback.",
+        ),
     )
     max_frames: int = Field(
         default=100,
@@ -235,7 +237,6 @@ class TracebacksPyProjectSettingsModel(TracebacksAbstractModel):
             from rich.syntax import Syntax
 
             self._syntax_theme = Syntax.get_theme(self._syntax_theme)
-
 
 
 class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
@@ -265,7 +266,8 @@ class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
     )
 
     highlighter: str | None = Field(
-        default=None, description="Highlighter to style log messages, or None to use ReprHighlighter"
+        default=None,
+        description="Highlighter to style log messages, or None to use ReprHighlighter",
     )
 
     markup: bool = Field(
@@ -308,7 +310,8 @@ class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
     )
 
     tracebacks_max_frames: int = Field(
-        default=100, description="Optional maximum number of frames returned by traceback. Default to 100"
+        default=100,
+        description="Optional maximum number of frames returned by traceback. Default to 100",
     )
 
     log_time_format: str | None = Field(
@@ -317,7 +320,8 @@ class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
     )
 
     keywords: list[str] | None = Field(
-        default_factory=list, description="List of words to highlight instead of ``RichHandler.KEYWORDS``."
+        default_factory=list,
+        description="List of words to highlight instead of ``RichHandler.KEYWORDS``.",
     )
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> Any:
@@ -325,27 +329,30 @@ class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
         return glom(self.model_fields, f"{field_name}.{field}")
 
 
-
 class TextualizeSettings(BaseSettings):
     model_config = SettingsConfigDict(
         title="Pytest Textualize Settings",
         pyproject_toml_depth=3,
-        pyproject_toml_table_header=('tool', 'textualize-settings'),
+        pyproject_toml_table_header=("tool", "textualize-settings"),
         toml_file=locate("pyproject.toml"),
         env_file=".env",
         env_file_encoding="utf-8",
         env_ignore_empty=True,
         case_sensitive=False,
         env_parse_none_str="None",
-        extra="forbid"
+        extra="forbid",
     )
     py_colors: int | None = Field(default=0, alias="PY_COLORS")
     console_outputs: bool | None = Field(default=False, alias="CONSOLE_OUTPUTS")
-    tracebacks: TracebacksPyProjectSettingsModel = Field(default_factory=TracebacksPyProjectSettingsModel)
+    tracebacks: TracebacksPyProjectSettingsModel = Field(
+        default_factory=TracebacksPyProjectSettingsModel
+    )
     logging: LoggingPyProjectSettingsModel = Field(default_factory=LoggingPyProjectSettingsModel)
     console: ConsolePyProjectSettingsModel = Field(default_factory=ConsolePyProjectSettingsModel)
     verbosity: Verbosity = Field(default=Verbosity.NORMAL)
-    log_format: str | None = Field(default="%(message)s", description="The logging.formatter template")
+    log_format: str | None = Field(
+        default="%(message)s", description="The logging.formatter template"
+    )
     pytestconfig: pytest.Config
     project: Mapping[str, Any] = Field(default_factory=dict)
     tool: Mapping[str, Any] = Field(default_factory=dict)
@@ -358,15 +365,19 @@ class TextualizeSettings(BaseSettings):
 
     @classmethod
     def settings_customise_sources(
-            cls,
-            settings_cls: type[BaseSettings],
-            init_settings: PydanticBaseSettingsSource,
-            env_settings: PydanticBaseSettingsSource,
-            dotenv_settings: PydanticBaseSettingsSource,
-            file_secret_settings: PydanticBaseSettingsSource,
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        return env_settings, init_settings, PyprojectTomlConfigSettingsSource(settings_cls), TomlConfigSettingsSource(
-            settings_cls)
+        return (
+            env_settings,
+            init_settings,
+            PyprojectTomlConfigSettingsSource(settings_cls),
+            TomlConfigSettingsSource(settings_cls),
+        )
 
     def model_post_init(self, context: Any, /) -> None:
         from _pytest.logging import get_option_ini
@@ -380,6 +391,3 @@ class TextualizeSettings(BaseSettings):
         self.logging.tracebacks_show_locals = self.pytestconfig.getoption("--showlocals")
         self.logging.log_time_format = get_option_ini(self.pytestconfig, "log_date_format")
         self.tracebacks.show_locals = self.pytestconfig.getoption("--showlocals")
-
-
-settings_key = pytest.StashKey[TextualizeSettings]()
