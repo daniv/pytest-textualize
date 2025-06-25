@@ -16,9 +16,10 @@ dependencies = [
     "pyhamcrest (>=2.1.0,<3.0.0)",
     "pydantic-settings (>=2.9.1,<3.0.0)",
     "glom (>=24.11.0,<25.0.0)",
-    "lark (>=1.2.2,<2.0.0)",
     "rich-argparse-plus (>=0.3.1.4,<0.4.0.0)",
-    "semver (>=3.0.4,<4.0.0)"
+    "semver (>=3.0.4,<4.0.0)",
+    "lore (>=0.8.6,<0.9.0)",
+    "lorem (>=0.1.1,<0.2.0)"
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -45,7 +46,6 @@ mypy = "^1.16.1"
 [tool.poetry.group.test.dependencies]
 pytest-mypy = "^1.0.1"
 pyhamcrest = "^2.1.0"
-python-lorem = "^1.3.0.post3"
 
 [tool.mypy]
 plugins = [
