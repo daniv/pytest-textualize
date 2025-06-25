@@ -177,11 +177,10 @@ class CollectStats(BaseModel):
 
 @auto
 class TestCollectionRecord(Timings):
-    count: int = 0
     error: dict[ModuleId, BaseException] = Field(default_factory=dict)
     skip: dict[NodeId, list[SkipInfo]] = Field(default_factory=dict)
     xfail: dict[NodeId, list[XfailInfo]] = Field(default_factory=dict)
-    deselected: list[NodeId] = Field(default_factory=list)
+    # deselected: list[NodeId] = Field(default_factory=list)
     stats: CollectStats = Field(default_factory=CollectStats)
 
     @property

@@ -1,16 +1,12 @@
-# Project : pytest-textualize
-# File Name : header.py
-# Dir Path : src/pytest_textualize/plugins/pytest_richtrace/richtrace/services
 from __future__ import annotations
 
-import os
 import re
 import shlex
+import subprocess
 from pathlib import Path
 from typing import Generator
 from typing import MutableMapping
 from typing import TYPE_CHECKING
-from typing import cast
 
 import pytest
 
@@ -146,29 +142,43 @@ class PoetryCollectorService:
 
     @pytest.hookimpl(trylast=True)
     def pytest_collect_env_info(self, config: pytest.Config) -> dict[str, Any] | None:
-        from pytest_textualize import __version__
+        from pytest_textualize import __version__ as textualize_version
 
-        if config.getoption("--trace-config"):
-            output = os.popen("poetry show -l -T").read()
-            if output:
-                packages = self.generate_output(output.splitlines())
-        result_ver = os.popen("poetry show -V").read()
-        return dict(
-            poetry_version=re.findall("[0-9.]+", result_ver.strip())[0],
-            project_version=__version__,
-            packages=locals().get("packages", None),
-        )
+        packages = None
+        poetry_version = None
+        try:
+            cmd = "poetry --version"
+            p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, shell=False)
+            stdout, _ = p.communicate()
+            poetry_version = re.findall(r"\d*\.\d+\.\d+", stdout.decode('utf-8'))[0]
+            from pytest_textualize.plugin import settings_key
+            settings = config.stash.get(settings_key, None)
+            from pytest_textualize import Verbosity
+            if config.getoption("--trace-config") or settings.verbosity >= Verbosity.VERY_VERBOSE:
+                cmd = "poetry show -T -l"
+                p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+                stdout, stderr = p.communicate()
+                if stdout:
+                    packages = self.generate_output(stdout.decode('utf-8').splitlines())
+        except subprocess.CalledProcessError as e:
+            pass
+
+        data = dict(textualize_version=textualize_version, poetry_version=poetry_version)
+        if packages:
+            data["packages"] = packages
+        return data
+
 
     @staticmethod
     def generate_output(lines: list[str]):
-        import semver
         from importlib.metadata import metadata
 
         packages = []
         packs = tuple(map(lambda x: tuple(filter(len, x.split(" ")))[:3], lines))
+        from pydantic_extra_types.semantic_version import SemanticVersion
         for name, current_ver, latest_ver in packs:
             try:
-                comp = semver.Version.parse(str(current_ver)).compare(str(latest_ver))
+                comp = SemanticVersion.validate_from_str(str(current_ver)).compare(str(latest_ver))
                 latest_ver = (
                     f"[poetry.outdated]{latest_ver}[/]"
                     if comp < 0

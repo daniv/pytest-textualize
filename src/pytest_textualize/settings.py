@@ -14,6 +14,7 @@ from typing import Literal
 from typing import TYPE_CHECKING
 
 import pytest
+from boltons import fileutils
 from glom import glom
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -354,9 +355,11 @@ class TextualizeSettings(BaseSettings):
         default="%(message)s", description="The logging.formatter template"
     )
     pytestconfig: pytest.Config
-    project: Mapping[str, Any] = Field(default_factory=dict)
+    project: Mapping[str, Any] = Field(default_factory=dict, alias="project")
+    pyproject: Mapping[str, Any] = Field(default_factory=dict, alias="project")
     tool: Mapping[str, Any] = Field(default_factory=dict)
-    toml_file: str | None = Field(default=None)
+    toml_file: Path | None = Field(default=None)
+    lock_file: Path | None = Field(default=None)
     build_system: Mapping[str, Any] = Field(default_factory=dict, alias="build-system")
 
     @staticmethod
@@ -387,6 +390,12 @@ class TextualizeSettings(BaseSettings):
         load_dotenv(file, verbose=True)
 
         self.toml_file = self.model_config.get("toml_file")
+        from boltons.fileutils import iter_find_files
+        filenames = sorted(iter_find_files(str(self.pytestconfig.rootpath), '*.lock'))
+        if filenames:
+            self.lock_file = Path(filenames[-1])
+            self.pyproject = {"project": self.project, "tool": self.tool, "build-system": self.build_system}
+
         self.logging.level = get_option_ini(self.pytestconfig, "log_level")
         self.logging.tracebacks_show_locals = self.pytestconfig.getoption("--showlocals")
         self.logging.log_time_format = get_option_ini(self.pytestconfig, "log_date_format")

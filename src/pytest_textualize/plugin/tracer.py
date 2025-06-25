@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from pydantic_extra_types.pendulum_dt import DateTime
-
-from .services import *
+from rich.padding import Padding
 
 from pytest_textualize import TextualizePlugins
 from pytest_textualize import stage_rule
@@ -107,16 +106,18 @@ class TextualizeTracer(BaseTextualizePlugin):
 
         stage_rule(self.console, "session", time_str=self._start_time)
         if not self.no_header:
+
             hook = session.config.pluginmanager.hook
             manager = HeaderServiceManager()
             manager.setup(session.config)
             manager.call(session.config)
             environment_data = hook.pytest_collect_env_info(config=session.config)
             manager.teardown(session.config)
-            
-            
-            self.pluginmanager.register(collection_tracer, name=collection_tracer.name)
-            hook.pytest_render_header(config=session.config, data=environment_data)
+
+            from .helpers.header_renderer import header_console_renderable
+            renderable = header_console_renderable(session.config, environment_data)
+            self.console.print(Padding(renderable, (0, 0, 0, 2)))
+            self.console.line(2)
 
     @pytest.hookimpl
     def pytest_collection_finish(self, session: pytest.Session) -> None:

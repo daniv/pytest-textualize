@@ -16,16 +16,15 @@ from hamcrest import ends_with
 from hamcrest import equal_to
 from hamcrest import instance_of
 from hamcrest import none
-from lorem import get_sentence
-from lorem import get_word
 from rich.color import ANSI_COLOR_NAMES
 from rich.table import Table
 from rich.text import Text
 
 from helpers import cleaned_dict
+from helpers.lorem import get_word
 from pytest_textualize import PrefixEnum
 from pytest_textualize import hook_msg
-from pytest_textualize.plugins import skipif_no_console
+from pytest_textualize.plugin import skipif_no_console
 
 if TYPE_CHECKING:
     from rich.console import Console

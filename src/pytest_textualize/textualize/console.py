@@ -3,12 +3,9 @@
 # Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
-from pprint import saferepr
 from typing import Literal
 from typing import TYPE_CHECKING
-
 # from typing import Any
 #
 # from typing import NoReturn
@@ -16,38 +13,24 @@ from typing import TYPE_CHECKING
 from typing import assert_never
 
 import pytest
-
-#
-from pydantic import TypeAdapter
-from rich.highlighter import ReprHighlighter
-from rich.padding import Padding
-from rich.pretty import Pretty
-from rich.table import Column
-
-from rich.table import Table
-from rich.text import Text
-from rich.panel import Panel
 from rich import box
 
-# from pygments import highlight
-# from typing_extensions import deprecated
+from rich.padding import Padding
+from rich.panel import Panel
+from rich.table import Column
+from rich.table import Table
+from rich.text import Text
+
 
 if TYPE_CHECKING:
-    from typing import Any
-    from typing import Type
     from collections.abc import Iterable
-    from collections.abc import Mapping
-    from collections.abc import Sequence
     from rich.text import TextType
     from rich.console import Console, ConsoleRenderable
     from rich.containers import RenderableType
     from rich.style import StyleType
-    from rich.padding import PaddingDimensions
-    from _pytest.python import CallSpec2
-    from rich.repr import RichReprResult
 
 
-def _is_markup(string: str) -> bool:
+def is_markup(string: str) -> bool:
     if string:
         text = Text.from_markup(string)
         return len(text.spans) > 0
@@ -113,7 +96,7 @@ class TracerMessage:
             if hasattr(self, "_info_str"):
                 if self.escape:
                     self._info_str = markup_escape(self._info_str)
-                if _is_markup(self._info_str):
+                if is_markup(self._info_str):
                     markup = Text.from_markup(self._info_str)
                     info.append(markup)
                     # info.append(rh(markup))
@@ -174,7 +157,7 @@ class KeyValueMessage:
         if hasattr(self, "_value_str"):
             if self.escape:
                 self._value_str = markup_escape(self._value_str)
-            if _is_markup(self._value_str):
+            if is_markup(self._value_str):
                 markup = Text.from_markup(self._value_str)
                 value_text.append(markup)
             else:

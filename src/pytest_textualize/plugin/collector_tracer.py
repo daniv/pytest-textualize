@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
     from rich.console import Console
-    from _pytest.compat import LEGACY_PATH
     from pytest_textualize.plugin import TestRunResults
     from pytest_textualize.settings import TextualizeSettings
     from rich.console import RenderableType
@@ -206,9 +205,6 @@ class CollectorTracer(BaseTextualizePlugin):
     @pytest.hookimpl
     def pytest_deselected(self, items: Sequence[pytest.Item]) -> None:
         self.collect.stats.total_deselected += len(items)
-        self.collect.deselected = list(map(lambda x: x.nodeid, items))
-        if self.verbosity > Verbosity.NORMAL:
-            hook_msg("pytest_deselected", info=f"{len(items)} items were deselected", console=self.console)
         return None
 
     @pytest.hookimpl
@@ -227,6 +223,7 @@ class CollectorTracer(BaseTextualizePlugin):
         except (ImportError, ModuleNotFoundError, Exception) as exc:
             self.collect.stats.total_errors += 1
             self.collect.stats.total_collected += 1
+
             # ---> collect rt reerror    self.test_run_results.collect.error[str(module_path)] = exc
         #     import traceback
         #     tf = traceback.extract_tb(exc.__traceback__)[-1]
@@ -301,26 +298,26 @@ class CollectorTracer(BaseTextualizePlugin):
         self._end_time = self.collect.finish.to_time_string()
         self.report_collect(True)
 
-        # lines = self.config.hook.pytest_report_collectionfinish(
-        #     config=self.config,
-        #     start_path=self.config.invocation_params.dir,
-        #     items=session.items,
-        # )
-        # self._write_report_lines_from_hooks(lines)
+        lines = self.config.hook.pytest_report_collectionfinish(
+            config=self.config,
+            start_path=self.config.invocation_params.dir,
+            items=session.items
+        )
+        for line in lines:
+            if isinstance(line, list):
+                for item in line:
+                    self.console.print(item[0])
+            self.console.print(line)
 
         if self.config.getoption("collectonly"):
             if session.items:
-                from pytest_textualize.plugin import collect_only_helper
+                from pytest_textualize.plugin import collect_only_report
 
-                renderable = collect_only_helper(session, 0)
+                renderable = collect_only_report(session)
                 self.console.print(Padding(renderable, (0, 0, 0, 3)), crop=False, overflow="ignore")
 
-                renderable = collect_only_helper(session, 1)
-                self.console.print(Padding(renderable, (0, 0, 0, 3)), crop=False, overflow="ignore")
-
-
-                renderable = collect_only_helper(session, 2)
-                self.console.print(Padding(renderable, (0, 0, 0, 3)), crop=False, overflow="ignore")
+            if self.results.collect.errors_count > 0:
+                pass
             # failed = self.stats.get("failed")
             # if failed:
             #     self._tw.sep("!", "collection failures")
@@ -333,34 +330,6 @@ class CollectorTracer(BaseTextualizePlugin):
         return None
 
 
-
-
-    # @pytest.hookimpl
-    # def pytest_pycollect_makeitem(
-    #         self, collector: pytest.Module | pytest.Class, name: str, obj: object
-    # ) -> None | pytest.Item | pytest.Collector | list[pytest.Item | pytest.Collector]:
-    #     pass
-
-
-    # @pytest.hookimpl
-    # def pytest_collection_modifyitems(
-    #         self, session: pytest.Session, config: pytest.Config, items: list[pytest.Item]
-    # ) -> None:
-    #     self.pluginmanager.hook.pytest_report_collection_modifyitems(session=session, config=config, items=items)
-
-
-
-
-
-    @pytest.hookimpl
-    def pytest_report_collectionfinish(
-        self,
-        config: pytest.Config,
-        start_path: Path,
-        startdir: LEGACY_PATH,
-        items: Sequence[pytest.Item],
-    ) -> str | list[str]:
-        pass
 
     @pytest.hookimpl
     def pytest_exception_interact(

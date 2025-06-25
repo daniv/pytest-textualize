@@ -39,8 +39,3 @@ def pytest_collect_env_info(config: pytest.Config) -> MutableMapping[str, Any] |
 @pytest.hookspec
 def pytest_plugin_unregistered(plugin: PytestPluginType) -> None:  # type:ignore[empty-body]
     pass
-
-
-@pytest.hookspec(firstresult=True)
-def pytest_render_header(config: pytest.Config, data: MutableMapping[str, Any]) -> bool:
-    pass

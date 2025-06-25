@@ -11,7 +11,6 @@ from typing import assert_never
 import pytest
 from rich import box
 from rich.columns import Columns
-from rich.console import ConsoleRenderable
 from rich.console import Group
 from rich.markup import escape
 from rich.panel import Panel
@@ -21,6 +20,8 @@ from rich.tree import Tree
 
 if TYPE_CHECKING:
     from rich.console import RenderableType
+    from collections.abc import Sequence
+    from rich.console import ConsoleRenderable
     from _pytest.nodes import Node
 
 
@@ -43,8 +44,8 @@ def _format_node(node: Node) -> RenderableType:
     obj = getattr(node, "obj", None)
     doc = inspect.getdoc(obj) if obj else None
     if doc:
-        table = Table(show_header=False, safe_box=True, show_edge=True, style="none")
-        table.add_column("Doc", style="none", no_wrap=True)
+        table = Table(show_header=False, safe_box=True, show_edge=True, style="#4CC9FE")
+        table.add_column("Doc", style="#BBE9FF", no_wrap=True)
         for line in doc.splitlines():
             table.add_row(line)
 
@@ -53,18 +54,17 @@ def _format_node(node: Node) -> RenderableType:
     return renderable
 
 
-def collectonly(session: pytest.Session, flag: int) -> ConsoleRenderable:
+def collect_only_report(session: pytest.Session) -> ConsoleRenderable:
     test_cases_verbosity = session.config.get_verbosity(pytest.Config.VERBOSITY_TEST_CASES)
     if test_cases_verbosity < 0:
         if test_cases_verbosity < -1:
-            return collect_counted(session)
+            return collected_groups(session)
         else:
-            return collectitems(session)
-    if flag == 0:
-        return collectitems(session)
-    if flag == 1:
-        return collect_counted(session)
+            return collected_list(session)
+    return collected_tree(session)
 
+
+def collected_tree(session: pytest.Session) -> ConsoleRenderable:
     root = Tree("pytest session", highlight=False, hide_root=True)
     stack: list[Node] = []
     tree_stack: list[Tree] = []
@@ -89,21 +89,21 @@ def collectonly(session: pytest.Session, flag: int) -> ConsoleRenderable:
     return panel
 
 
-def collectitems(session: pytest.Session) -> ConsoleRenderable:
+def collected_list(session: pytest.Session) -> ConsoleRenderable:
     renderables: list[str] = []
     for i, item in enumerate(session.items, start=1):
-        renderables.append(f"[#97866A]{i}.[/]{escape(item.name)}")
+        renderables.append(f"[#9FB3DF]{i}.[/]{escape(item.name)}")
     return Panel(
         Columns(renderables, column_first=True, expand=True),
-        title="[#EAE4D5]collection_modifyitems",
-        style="#D29F80",
-        border_style="#735557",
+        title="[#C5D3E8]Selected items",
+        style="#BBE9FF",
+        border_style="#4CC9FE",
         box=box.DOUBLE,
         padding=(1, 0, 0, 1),
     )
 
 
-def collect_counted(session: pytest.Session) -> ConsoleRenderable:
+def collected_groups(session: pytest.Session | None = None, items: Sequence[pytest.Item] | None = None) -> ConsoleRenderable:
     from rich.traceback import PathHighlighter
     path_highlighter = PathHighlighter()
     def get_content(n: str, c: int):
@@ -113,11 +113,14 @@ def collect_counted(session: pytest.Session) -> ConsoleRenderable:
             justify="center",
         ))
 
-    counts = Counter(item.nodeid.split("::", 1)[0] for item in session.items)
+    if session is not None:
+        items = session.items
+
+    counts = Counter(item.nodeid.split("::", 1)[0] for item in items)
     renderables = [Panel(get_content(name, count), expand=False) for name, count in sorted(counts.items())]
     return Panel(
         Columns(renderables, column_first=True, expand=False),
-        title="[#EAE4D5]Collected Items",
+        title="[#EAE4D5]Selected Items by module",
         style="#D29F80",
         border_style="#735557",
         box=box.DOUBLE,

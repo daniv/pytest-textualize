@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from helpers.manifest import ManifestDirectory
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,7 +35,7 @@ def pytest_addoption(parser: pytest.Parser, pluginmanager: pytest.PytestPluginMa
         default=True,
         help="Do not print console outputs during tests.",
     )
-    from pytest_textualize.plugin import textualize_plugin
+    from pytest_textualize.plugin import plugin as textualize_plugin
     pluginmanager.register(textualize_plugin, textualize_plugin.PLUGIN_NAME)
 
 
@@ -52,6 +53,15 @@ def pytest_ignore_collect(
     if collection_path.is_file():
         if any([is_hidden_or_pack(collection_path), is_not_py(collection_path)]):
             return True
+    return None
+
+
+@pytest.hookimpl
+def pytest_collect_directory(path, parent):
+    # Use our custom collector for directories containing a `manifest.json` file.
+    if path.joinpath("manifest.json").is_file():
+        return ManifestDirectory.from_parent(parent=parent, path=path)
+    # Otherwise fallback to the standard behavior.
     return None
 
 

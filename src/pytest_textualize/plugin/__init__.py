@@ -15,44 +15,45 @@ __all__ = (
     "cleanup_factory",
     "PythonCollectorService",
     "skipif_no_console",
-    "collect_only_helper",
-    "collected_items_helper", 
-    "HeaderRenderer",
+    "collected_tree",
+    "collected_list",
     "console_key",
     "collector_tracer",
     "error_console_key",
-    "settings_key"
+    "settings_key",
+    "collected_groups",
+    "collect_only_report",
+    "ConsoleMessage"
 )
 
-
+from typing import NewType
 from typing import TYPE_CHECKING
 
 import pytest
-from rich.console import ConsoleRenderable
-
 
 from pytest_textualize.plugin import plugin as textualize_plugin
-from pytest_textualize.plugin.exceptions import ConsoleMessage
-from pytest_textualize.plugin.model import TestRunResults
 from pytest_textualize.plugin.collector_tracer import (
     CollectorTracer,
 )
 from pytest_textualize.plugin.error_tracer import (
     ErrorExecutionTracer,
 )
+from pytest_textualize.plugin.exceptions import ConsoleMessage
+from pytest_textualize.plugin.helpers.collectors import collect_only_report
+from pytest_textualize.plugin.helpers.collectors import collected_groups
+from pytest_textualize.plugin.helpers.collectors import collected_list
+from pytest_textualize.plugin.helpers.collectors import collected_tree
+from pytest_textualize.plugin.model import TestRunResults
 from pytest_textualize.plugin.plugin import skipif_no_console
-from pytest_textualize.plugin.services.header_data_collector import PythonCollectorService
-from pytest_textualize.plugin.services.header_renderer import HeaderRenderer
 from pytest_textualize.plugin.runtest_tracer import RunTestTracer
+from pytest_textualize.plugin.services.header_data_collector import PythonCollectorService
+from pytest_textualize.plugin.tracer import TextualizeTracer
 from pytest_textualize.plugin.textualize_reporter import (
     TextualizeReporter,
 )
-from pytest_textualize.plugin.tracer import TextualizeTracer
-
 
 if TYPE_CHECKING:
-    PytestPluginType = object
-
+    PytestPluginType = NewType("PytestPluginType", object)
 
 from rich.console import Console
 from pytest_textualize.settings import TextualizeSettings
@@ -61,12 +62,14 @@ error_console_key = pytest.StashKey[Console]()
 settings_key = pytest.StashKey[TextualizeSettings]()
 
 
-def cleanup_factory(pluginmanager: pytest.PytestPluginManager, plugin: PytestPluginType):
+
+
+def cleanup_factory(pluginmanager: pytest.PytestPluginManager, plugin_: PytestPluginType):
     def clean_up() -> None:
-        name = pluginmanager.get_name(plugin)
-        # TODO: log message
+        name = pluginmanager.get_name(plugin_)
+        # todo: log message
         pluginmanager.unregister(name=name)
-        pluginmanager.hook.pytest_plugin_unregistered(plugin=plugin)
+        pluginmanager.hook.pytest_plugin_unregistered(plugin=plugin_)
 
     return clean_up
 
@@ -74,12 +77,3 @@ def cleanup_factory(pluginmanager: pytest.PytestPluginManager, plugin: PytestPlu
 class NotTest:
     def __init_subclass__(cls):
         cls.__test__ = NotTest not in cls.__bases__
-
-
-def collect_only_helper(session: pytest.Session, t) -> ConsoleRenderable:
-    from pytest_textualize.plugin.helpers.collectors import collectonly
-    return collectonly(session, t)
-
-def collected_items_helper(session: pytest.Session) -> ConsoleRenderable:
-    from pytest_textualize.plugin.helpers.collectors import collectitems
-    return collectitems(session)
