@@ -3,10 +3,12 @@
 # Dir Path : src/pytest_textualize/plugins/pytest_richtrace/richtrace
 from __future__ import annotations
 
+from subprocess import CalledProcessError
 from typing import Any
 from typing import TYPE_CHECKING
 
 import pytest
+from pathlib import Path
 from _pytest import timing
 from _pytest.terminal import REPORT_COLLECTING_RESOLUTION
 from boltons.strutils import cardinalize
@@ -28,7 +30,6 @@ if TYPE_CHECKING:
     from collections.abc import Generator
     from collections.abc import Mapping
     from collections.abc import Sequence
-    from pathlib import Path
     from rich.console import Console
     from pytest_textualize.plugin import TestRunResults
     from pytest_textualize.settings import TextualizeSettings
@@ -211,6 +212,9 @@ class CollectorTracer(BaseTextualizePlugin):
     def pytest_pycollect_makemodule(self, module_path: Path, parent: pytest.Collector) -> pytest.Module | None:
         from _pytest.pathlib import import_path
 
+        if self.verbosity > Verbosity.NORMAL:
+            hook_msg("pytest_pycollect_makemodule", info=parent.nodeid, console=self.console)
+
         import_mode = self.config.getoption("--import-mode")
         try:
             consider_namespace_packages = self.config.getini("consider_namespace_packages")
@@ -220,73 +224,40 @@ class CollectorTracer(BaseTextualizePlugin):
                 root=self.config.rootpath,
                 consider_namespace_packages=consider_namespace_packages,
             )
-        except (ImportError, ModuleNotFoundError, Exception) as exc:
-            self.collect.stats.total_errors += 1
-            self.collect.stats.total_collected += 1
+        except (ImportError, ModuleNotFoundError, SyntaxError, BaseException) as exc:
+            from pytest_textualize.plugin import ConsoleMessage
+            from pytest_textualize.plugin import TextualizeRuntimeError
 
-            # ---> collect rt reerror    self.test_run_results.collect.error[str(module_path)] = exc
-        #     import traceback
-        #     tf = traceback.extract_tb(exc.__traceback__)[-1]
-        #     from pytest_textualize.plugin.pytest_richtrace.exceptions import ConsoleMessage
-        #     # from pytest_textualize.plugin.pytest_richtrace.exceptions import PytestTextualizeRuntimeError
-        #     from rich.text import Text
-        #     from rich.containers import Lines, Renderables
-        #
-        #     file = Path(tf.filename).relative_to(self.config.rootpath).as_posix()
-        #     renderables = Renderables(
-        #         [f"description: {exc.__doc__}", f"message: {tf.line}", f"file: {file}", f"lineno: {tf.lineno}"]
-        #     )
-        #     self.console.print(renderables)
-        #     pass
-        #
-        #
-        #     tb = [f"description:{exc.__doc__}", f"file:{file}", f"message:{tf.line}", f"lineno:{tf.lineno}"]
-        #     Text()
-        #     try:
-        #         c = ConsoleMessage("\n".join(tb)).indent("  - ") #.style("#F6FFDE")
-        #         self.console.print(c.text)
-        #     except Exception as exc:
-        #         pass
-        #
-        #
-        #     c = ConsoleMessage("ddd").make_section("Causes", indent=" - ")
-        #     self.console.print(c.text)
-        #
-        #     exc.add_note("hook pytest_pycollect_makemodule")
-        #     reason = str(exc)
-        #
-        #     messages = [
-        #         ConsoleMessage(
-        #             "[bold]Causes:[/]\n"
-        #             "  - The error occurred while pytest was collecting a testing module.\n"
-        #             "  - The imported module is probably malformed and contains Syntax errors.\n"
-        #             "  - network interruptions or errors causing corrupted downloads\n\n"
-        #             "[b]Solutions:[/]\n"
-        #             "  1. Try running your command again using the <c1>--no-cache</> global option enabled.\n"
-        #             "  2. Try regenerating your lock file using (<c1>poetry lock --no-cache --regenerate</>).\n\n"
-        #             "If any of those solutions worked, you will have to clear your caches using (<c1>poetry cache clear --all CACHE_NAME</>)."
-        #         ),
-        #     ]
-        #     py = PytestTextualizeRuntimeError(reason, messages)
-        #     error_console = console_factory(self.config, "stderr")
-        #     py.write(error_console, self.config.option.verbose)
-        #     pass
-        #
-        #     exc_type, exc_value, traceback = sys.exc_info()
-        #     self.console.print_exception(max_frames=10)
-        #     if not self.config.option.continue_on_collection_errors:
-        #         pytest.exit(exc.msg)
-        #     INDENT = "    "
-        #
-        #     # TODO: should be in reporter
-        #     message = exc.msg
-        #
-        #     self.console.print(f"{INDENT}[error]Error collecting module[/]:")
-        #     self.console.print(f"{INDENT * 2}[white]{module_path}[/]")
-        #     if message:
-        #         self.console.print(f"{INDENT * 2}{message}")
-        #
-        # raise PytestTextualizeRuntimeError(reason, messages)
+
+            relative = module_path.relative_to(self.config.rootpath)
+            ph = PathHighlighter()
+            markup = ph(relative.as_posix()).markup
+
+            import traceback
+            tf = traceback.extract_tb(exc.__traceback__)[-1]
+            cause_file = Path(tf.filename)
+            link = f"{cause_file.as_posix()}:{tf.lineno}"
+            if self.isatty:
+                location = f"[bright_blue][link={link}][blue u]{cause_file.name}_{tf.lineno}[/][/link] <-click[/]"
+
+            messages = []
+            msg = ConsoleMessage(debug=True,
+                text="The error occurred while pytest was collecting a testing module.\n"
+                                      f"[scope.key_ni]module_path:[/] {markup}\n"
+                                      f"[scope.key_ni]collector:[/] {str(parent)}\n"
+                                      "The exception was caught on [pyest.hook.tag]hook: [/][pyest.hook.name]pytest_pycollect_makemodule[/].\n"
+
+
+                                 ).make_section("Causes", "    | ").text
+            messages.append(msg)
+            if self.isatty:
+                messages.append(ConsoleMessage(debug=True, text=f"at {location}").make_section("Location", "   | ").text)
+
+            error = TextualizeRuntimeError.create(reason="Error collecting module", exception=exc, info=messages)
+            self.console.line()
+            error.write(self.console, self.verbosity)
+            if not self.isatty:
+                self.console.print("", location)
         return None
 
     @pytest.hookimpl

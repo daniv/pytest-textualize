@@ -1,22 +1,16 @@
-# Project : pytest-textualize
-# File Name : test_exections_textualize_runtime_error.py
-# Dir Path : tests/in_progress
-
 from __future__ import annotations
 
 from subprocess import CalledProcessError
 from typing import TYPE_CHECKING
-from typing import Sized
-from typing import TypeVar
+
 import pytest
 from _pytest.config import ExitCode as ec
-
-from hamcrest import instance_of
-from pytest import param
-from pytest import mark
 from hamcrest import assert_that
 from hamcrest import equal_to
+from hamcrest import instance_of
+from pytest import param
 
+from pytest_textualize import Verbosity
 from pytest_textualize.plugin import ConsoleMessage
 from pytest_textualize.plugin.exceptions import TextualizeRuntimeError
 
@@ -30,7 +24,7 @@ parameterize = pytest.mark.parametrize
     ("reason", "messages", "exit_code", "expected_reason"),
     [
         ("Error occurred!", None, ec.INTERNAL_ERROR, "Error occurred!"),
-        ("Specific error", [ConsoleMessage("Additional details.")], ec.USAGE_ERROR, "Specific error"),
+        ("Specific error", [ConsoleMessage(text="Additional details.")], ec.USAGE_ERROR, "Specific error"),
         ("Minimal error", [], ec.TESTS_FAILED, "Minimal error")
     ],
 )
@@ -55,23 +49,23 @@ def test_poetry_runtime_error_init(
     [
         param(False, "",
                 [
-                    ConsoleMessage("Info message"),
-                    ConsoleMessage("Debug message"),
+                    ConsoleMessage(text="Info message"),
+                    ConsoleMessage(text="Debug message"),
                 ], "Error\n\nInfo message\n\nDebug message", id="default"
         ),
         param(True, "",
                 [
-                    ConsoleMessage("[b]Bolded message[/b]"),
-                    ConsoleMessage("[i]Debug Italics Message[/i]"),
+                    ConsoleMessage(text="[b]Bolded message[/b]"),
+                    ConsoleMessage(text="[i]Debug Italics Message[/i]"),
                 ], "Error\n\nBolded message\n\nDebug Italics Message", id="stripped tags"
         ),
         param(False, "",
               [
-                  ConsoleMessage("[b]Bolded message[/b]"),
-                  ConsoleMessage("[i]Debug Italics Message[/i]"),
+                  ConsoleMessage(text="[b]Bolded message[/b]"),
+                  ConsoleMessage(text="[i]Debug Italics Message[/i]"),
               ], "Error\n\n[b]Bolded message[/b]\n\n[i]Debug Italics Message[/i]", id="unstripped tags"
         ),
-        param(False, "    ", [ConsoleMessage("Error occurred!")],
+        param(False, "    ", [ConsoleMessage(text="Error occurred!")],
                 "    Error\n    \n    Error occurred!", id="indented"
         ),  
     ],
@@ -111,7 +105,7 @@ def test_poetry_runtime_error_get_text(
         (
             "Subprocess error",
             CalledProcessError(1, ["cmd"], b"stdout", b"stderr"),
-            ["Additional info"],
+            ["Additional info-"],
             [
                 "Subprocess error",
                 "[logging.level.warning][b]Exception:[/]\n"
@@ -125,7 +119,6 @@ def test_poetry_runtime_error_get_text(
     ],
 )
 def test_poetry_runtime_error_create(
-    console: Console,
     reason: str,
     exception: Exception,
     info: list[str],
@@ -133,13 +126,11 @@ def test_poetry_runtime_error_create(
 ) -> None:
     """Test the create class method of TextualizeRuntimeError."""
     error = TextualizeRuntimeError.create(reason, exception, info)
-    from pytest_textualize import Verbosity
-    error.write(console, Verbosity.VERBOSE)
-    pass
-    # assert_that(isinstance(error, TextualizeRuntimeError),equal_to(True), reason="instance_of")
-    # assert_that(all(isinstance(msg, ConsoleMessage) for msg in error._messages))
-    # actual_texts = [msg.text for msg in error._messages]
-    # assert_that(actual_texts, equal_to(expected_message_texts))
+
+    assert_that(isinstance(error, TextualizeRuntimeError),equal_to(True), reason="instance_of")
+    assert_that(all(isinstance(msg, ConsoleMessage) for msg in error._messages))
+    actual_texts = [msg.text for msg in error._messages]
+    assert_that(actual_texts, equal_to(expected_message_texts))
     
 
 def test_poetry_runtime_error_append(console: Console) -> None:
@@ -151,8 +142,12 @@ def test_poetry_runtime_error_append(console: Console) -> None:
 
 
 def testa(console: Console) -> None:
+    exc = CalledProcessError(0, ["cmd", "--der", "-l"], b"stdout", b"stderr")
+    # message = ConsoleMessage(text=str(exc).strip(), debug=True).make_section("Exception", "    | ")
+    # console.print(message.text)
+    # pass
 
-    error = TextualizeRuntimeError.create( "Command failure", Exception("An exception occurred"), None)
-    from pytest_textualize import Verbosity
+
+    error = TextualizeRuntimeError.create( "Subprocess error", exc, "Additional info")
     error.write(console, Verbosity.VERBOSE)
     pass

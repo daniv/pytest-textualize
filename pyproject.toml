@@ -86,7 +86,7 @@ line_length = 100
 [tool.pytest.ini_options]
 minversion = "8.3"
 verbosity_assertions = 0
-norecursedirs = [".*", "src", "static", "helpers"]
+norecursedirs = [".*", "src", "static", "helpers", "in_progress"]
 log_level = "ERROR"
 log_format = "%(message)s"
 log_date_format = "[%X]"

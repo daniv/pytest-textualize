@@ -23,7 +23,8 @@ __all__ = (
     "settings_key",
     "collected_groups",
     "collect_only_report",
-    "ConsoleMessage"
+    "ConsoleMessage",
+    "TextualizeRuntimeError"
 )
 
 from typing import NewType
@@ -38,7 +39,6 @@ from pytest_textualize.plugin.collector_tracer import (
 from pytest_textualize.plugin.error_tracer import (
     ErrorExecutionTracer,
 )
-from pytest_textualize.plugin.exceptions import ConsoleMessage
 from pytest_textualize.plugin.helpers.collectors import collect_only_report
 from pytest_textualize.plugin.helpers.collectors import collected_groups
 from pytest_textualize.plugin.helpers.collectors import collected_list
@@ -51,6 +51,9 @@ from pytest_textualize.plugin.tracer import TextualizeTracer
 from pytest_textualize.plugin.textualize_reporter import (
     TextualizeReporter,
 )
+from pytest_textualize.plugin.exceptions import ConsoleMessage
+from pytest_textualize.plugin.exceptions import TextualizeRuntimeError
+
 
 if TYPE_CHECKING:
     PytestPluginType = NewType("PytestPluginType", object)
