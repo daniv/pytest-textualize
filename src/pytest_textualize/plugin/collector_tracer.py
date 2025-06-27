@@ -254,8 +254,15 @@ class CollectorTracer(BaseTextualizePlugin):
                 messages.append(ConsoleMessage(debug=True, text=f"at {location}").make_section("Location", "   | ").text)
 
             error = TextualizeRuntimeError.create(reason="Error collecting module", exception=exc, info=messages)
-            self.console.line()
-            error.write(self.console, self.verbosity)
+
+            from pytest_textualize.plugin.model import TestCollectionRecord
+            record = TestCollectionRecord.create_error_model(when="collect", nodeid=str(module_path))
+            record.exception = exc
+            record.runtime_error = error
+            self.results.collect.errors[str(module_path)] = record
+
+            self.console_logger.warning("Error collecting module", f"[white]{str(module_path)}[/]")
+            self.console_logger.warning(f"message: {str(exc)}")
             if not self.isatty:
                 self.console.print("", location)
         return None
