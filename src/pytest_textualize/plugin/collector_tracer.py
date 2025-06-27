@@ -1,14 +1,9 @@
-# Project : pytest-textualize
-# File Name : collector_observer.py
-# Dir Path : src/pytest_textualize/plugins/pytest_richtrace/richtrace
 from __future__ import annotations
 
-from subprocess import CalledProcessError
-from typing import Any
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from pathlib import Path
 from _pytest import timing
 from _pytest.terminal import REPORT_COLLECTING_RESOLUTION
 from boltons.strutils import cardinalize
@@ -19,12 +14,14 @@ from rich.segment import ControlType
 from rich.text import Text
 from rich.traceback import PathHighlighter
 
-from pytest_textualize import PrefixEnum
 from pytest_textualize import TextualizePlugins
-from pytest_textualize import Verbosity
-from pytest_textualize import hook_msg
-from pytest_textualize import stage_rule
+from pytest_textualize.plugin.exceptions import ConsoleMessage
+from pytest_textualize.textualize.verbose_log import Verbosity
+from pytest_textualize import trace_logger
 from pytest_textualize.plugin.base import BaseTextualizePlugin
+from pytest_textualize.textualize import PrefixEnum
+from pytest_textualize.textualize import hook_msg
+from pytest_textualize.textualize import stage_rule
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -46,7 +43,7 @@ class CollectorTracer(BaseTextualizePlugin):
         self.config: pytest.Config | None = None
         self.settings: TextualizeSettings | None = None
         self.console: Console | None = None
-        self.results = results
+        self.results: TestRunResults = results
         self.pluginmanager: pytest.PytestPluginManager | None = None
         self.collect = results.collect
 
@@ -54,6 +51,7 @@ class CollectorTracer(BaseTextualizePlugin):
         self._end_time: str | None = None
         self._last_write = timing.Instant()
         self._pytest_session: pytest.Session | None = None
+        self.console_logger = trace_logger()
 
 
     def __repr__(self) -> str:
@@ -80,38 +78,44 @@ class CollectorTracer(BaseTextualizePlugin):
         super().configure(config)
         self.pluginmanager = config.pluginmanager
 
-
     @pytest.hookimpl(tryfirst=True)
     def pytest_collection(self, session: pytest.Session) -> None:
+        """Called at the start of collection. """
+        from pytest_textualize.plugin.model import TestCollectionRecord
         import time
 
         self._pytest_session = session
-        self.collect.precise_start = time.perf_counter()
-        self.collect.start = DateTime.now()
-        self._start_time = self.collect.start.to_time_string()
+
+        precise_start = time.perf_counter()
+        start = DateTime.now()
+        self._start_time = start.to_time_string()
+        self.collect = TestCollectionRecord(precise_start=precise_start, start=start)
+        self.results.collect = self.collect
 
         if self.verbosity > Verbosity.NORMAL:
             stage_rule(self.console, "collection", time_str=self._start_time)
             node_id = session.nodeid if session.nodeid else session.name
-            hook_msg("pytest_collection", info=node_id, console=self.console)
+            results = hook_msg("pytest_collection", info=node_id)
+            self.console_logger.log(*results, verbosity=Verbosity.VERBOSE)
 
         end = "" if self.verbosity == Verbosity.NORMAL else "\n"
         if self.isatty:
             if self.verbosity >= Verbosity.NORMAL:
-                self.console.print(f"[b] {PrefixEnum.PREFIX_SQUARE} collecting ... [/]", end=end)
+                self.console.print(f"[b]{PrefixEnum.PREFIX_SQUARE} collecting ... [/]", end=end)
                 self.console.file.flush()
         elif self.verbosity >= Verbosity.NORMAL:
 
-            self.console.print(f"[b] {PrefixEnum.PREFIX_SQUARE} collecting ... [/]", end=end)
+            self.console.print(f"[b]{PrefixEnum.PREFIX_SQUARE} collecting ... [/]", end=end)
             self.console.file.flush()
 
     @pytest.hookimpl
     def pytest_collectreport(self, report: pytest.CollectReport) -> None:
         if report.failed:
             self.collect.stats.total_errors += 1
+            if report.head_line in self.collect.errors:
+                self.collect.errors[report.head_line].collect_report = report
         elif report.skipped:
             self.collect.stats.total_skipped += 1
-
         if self.isatty:
             self.report_collect()
 
@@ -211,9 +215,10 @@ class CollectorTracer(BaseTextualizePlugin):
     @pytest.hookimpl
     def pytest_pycollect_makemodule(self, module_path: Path, parent: pytest.Collector) -> pytest.Module | None:
         from _pytest.pathlib import import_path
+        import traceback
 
-        if self.verbosity > Verbosity.NORMAL:
-            hook_msg("pytest_pycollect_makemodule", info=parent.nodeid, console=self.console)
+        msg = hook_msg("pytest_pycollect_makemodule", info=parent.nodeid)
+        self.console_logger.log(*msg, verbosity=Verbosity.VERBOSE)
 
         import_mode = self.config.getoption("--import-mode")
         try:
@@ -225,46 +230,40 @@ class CollectorTracer(BaseTextualizePlugin):
                 consider_namespace_packages=consider_namespace_packages,
             )
         except (ImportError, ModuleNotFoundError, SyntaxError, BaseException) as exc:
-            from pytest_textualize.plugin import ConsoleMessage
             from pytest_textualize.plugin import TextualizeRuntimeError
 
+            # todo: is already counted?
+            self.collect.stats.total_collected += 1
 
             relative = module_path.relative_to(self.config.rootpath)
             ph = PathHighlighter()
             markup = ph(relative.as_posix()).markup
-
-            import traceback
             tf = traceback.extract_tb(exc.__traceback__)[-1]
-            cause_file = Path(tf.filename)
-            link = f"{cause_file.as_posix()}:{tf.lineno}"
-            if self.isatty:
-                location = f"[bright_blue][link={link}][blue u]{cause_file.name}_{tf.lineno}[/][/link] <-click[/]"
 
             messages = []
             msg = ConsoleMessage(debug=True,
-                text="The error occurred while pytest was collecting a testing module.\n"
+                text="[python.line.comment]The error occurred while pytest was collecting a testing module.[/]\n"
                                       f"[scope.key_ni]module_path:[/] {markup}\n"
                                       f"[scope.key_ni]collector:[/] {str(parent)}\n"
-                                      "The exception was caught on [pyest.hook.tag]hook: [/][pyest.hook.name]pytest_pycollect_makemodule[/].\n"
-
-
+                                      "The exception was caught on [pyest.hook.tag]hook: "
+                     "[/][pyest.hook.name]pytest_pycollect_makemodule[/].\n"
                                  ).make_section("Causes", "    | ").text
             messages.append(msg)
-            if self.isatty:
-                messages.append(ConsoleMessage(debug=True, text=f"at {location}").make_section("Location", "   | ").text)
-
             error = TextualizeRuntimeError.create(reason="Error collecting module", exception=exc, info=messages)
 
             from pytest_textualize.plugin.model import TestCollectionRecord
             record = TestCollectionRecord.create_error_model(when="collect", nodeid=str(module_path))
             record.exception = exc
             record.runtime_error = error
-            self.results.collect.errors[str(module_path)] = record
-
+            self.results.collect.errors[str(relative.as_posix())] = record
+            # 'tests/test_exceptions_console_message.py'
             self.console_logger.warning("Error collecting module", f"[white]{str(module_path)}[/]")
             self.console_logger.warning(f"message: {str(exc)}")
             if not self.isatty:
+                cause_relative = module_path.relative_to(self.config.rootpath)
+                location = f"{cause_relative.as_posix()}:{tf.lineno}"
                 self.console.print("", location)
+
         return None
 
     @pytest.hookimpl
@@ -296,48 +295,11 @@ class CollectorTracer(BaseTextualizePlugin):
 
             if self.results.collect.errors_count > 0:
                 pass
-            # failed = self.stats.get("failed")
-            # if failed:
-            #     self._tw.sep("!", "collection failures")
-            #     for rep in failed:
-            #         rep.toterminal(self._tw)
 
-        if self.verbosity > Verbosity.NORMAL:
-            hook_msg("pytest_collection_finish", info=session.name, console=self.console)
-            stage_rule(self.console, "collection", time_str=self._end_time, start=False)
+        results = hook_msg("pytest_collection_finish", info=session.name)
+        self.console_logger.log(*results, verbosity=Verbosity.VERBOSE)
+        stage_rule(self.console, "collection", time_str=self._end_time, start=False)
         return None
-
-
-
-    @pytest.hookimpl
-    def pytest_exception_interact(
-        self,
-        node: pytest.Item | pytest.Collector,
-        call: pytest.CallInfo[Any],
-        report: pytest.CollectReport | pytest.TestReport,
-    ) -> None:
-        raise call.excinfo.value
-
-    @pytest.hookimpl
-    def pytest_runtestloop(self, session: pytest.Session) -> object | None:
-        pass
-
-    @pytest.hookimpl
-    def pytest_sessionfinish(
-        self,
-        session: pytest.Session,
-        exitstatus: int | pytest.ExitCode,
-    ) -> None:
-        pass
-
-    @pytest.hookimpl
-    def pytest_terminal_summary(
-        self,
-        terminalreporter: pytest.TerminalReporter,
-        exitstatus: pytest.ExitCode,
-        config: pytest.Config,
-    ) -> None:
-        pass
 
     @pytest.hookimpl
     def pytest_report_teststatus(  # type:ignore[empty-body]

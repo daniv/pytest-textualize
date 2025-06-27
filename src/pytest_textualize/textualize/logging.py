@@ -125,23 +125,25 @@ class TextualizeConsoleLogRender(LogRender):
 
         row.append(Renderables(renderables))
         if self.show_path and path:
-            link_path = Path(link_path).as_posix()
-            path_text = Text()
+            # link_path = Path(link_path).as_posix()
+            path_text = ""
             if sys.stdout.isatty():
                 if link_path:
-                    markup = Text.from_markup(f"[link={link_path}][bright_blue]{path}[/][/link]")
-                    path_text.append_text(markup)
+                    markup = Text.from_markup(f"[link={link_path}][blue]{path}[/link][/]")
+                    path_text = f"[link={link_path}][blue]{path}[/link][/]"
                 else:
-                    path_text.append(path)
+                    path_text = path
                 if line_no:
                     if link_path:
-                        path_text = Text()
+                        # path_text = Text()
                         markup = Text.from_markup(
-                            f"[link={link_path}:{line_no}][bright_blue]{path}:{line_no}[/][/link]"
+                            f"[blue][link={link_path}:{line_no}]{path}:{line_no}[/link][/]"
                         )
-                        path_text.append_text(markup)
+                        #path_text.append_text(markup)
+                        path_text = f"[link={link_path}:{line_no}][blue]{path}:{line_no}[/link][/]"
                     else:
-                        path_text.append(f":{line_no}", style="bright_blue")
+                        #path_text.append(f":{line_no}", style="bright_blue")
+                        path_text = f":{line_no}"
             else:
                 if line_no:
                     path_text.append(f"{path}:{line_no}", style="bright_blue")

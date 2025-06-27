@@ -18,6 +18,7 @@ class ArgparseArgsHighlighter(RegexHighlighter):
         r"`(?P<syntax>[^`]*)`",  # highlight text in backquotes as syntax
     ]
 
+
 class NodeItemHighlighter(RegexHighlighter):
     base_style = "pytest."
     highlights = [r"(?P<node_path>.*/)(?P<node_name>.+)"]

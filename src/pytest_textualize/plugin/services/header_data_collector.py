@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Generator
 from typing import MutableMapping
@@ -136,6 +138,39 @@ class PluggyCollectorService:
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name='{self.name}'>"
 
+
+def sysexec(self, *argv: os.PathLike[str], **popen_opts: Any) -> str:
+    """Return stdout text from executing a system child process,
+    where the 'self' path points to executable.
+    The process is directly invoked and not through a system shell.
+    """
+    from subprocess import PIPE
+    from subprocess import Popen
+
+    popen_opts.pop("stdout", None)
+    popen_opts.pop("stderr", None)
+    proc = Popen(
+        [str(self)] + [str(arg) for arg in argv],
+        **popen_opts,
+        stdout=PIPE,
+        stderr=PIPE,
+    )
+    stdout: str | bytes
+    stdout, stderr = proc.communicate()
+    ret = proc.wait()
+    if isinstance(stdout, bytes):
+        stdout = stdout.decode(sys.getdefaultencoding())
+    if ret != 0:
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(sys.getdefaultencoding())
+        raise RuntimeError(
+            ret,
+            ret,
+            str(self),
+            stdout,
+            stderr,
+        )
+    return stdout
 
 class PoetryCollectorService:
     name = TextualizePlugins.POETRY_COLLECTOR_SERVICE

@@ -91,7 +91,7 @@ log_level = "ERROR"
 log_format = "%(message)s"
 log_date_format = "[%X]"
 addopts = [
-    "-p no:logging", "-ra", "--assert=plain", "--tb=no"
+    "-p no:logging", "-ra", "--assert=plain"
 ]
 
 [tool.textualize-settings.console]

@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from enum import IntEnum
 from pathlib import Path
 from typing import Any
+from typing import Final
 from typing import Literal
 from typing import TYPE_CHECKING
 
@@ -25,6 +26,7 @@ from pydantic_settings import PydanticBaseSettingsSource
 from pydantic_settings import PyprojectTomlConfigSettingsSource
 from pydantic_settings import SettingsConfigDict
 from pydantic_settings import TomlConfigSettingsSource
+from pytest_textualize.textualize.verbose_log import Verbosity
 
 if TYPE_CHECKING:
     from rich.syntax import ANSISyntaxTheme
@@ -66,13 +68,6 @@ def locate(filename: str, cwd: Path | None = None) -> Path:
 
     raise FileNotFoundError(f"Could not located the file '{filename}'")
 
-
-class Verbosity(IntEnum):
-    QUIET = -1  # --quiet
-    NORMAL = 0
-    VERBOSE = 1  # -v
-    VERY_VERBOSE = 2  # -vv
-    DEBUG = 3  # -vvv
 
 
 class ConsolePyProjectSettingsModel(BaseModel):

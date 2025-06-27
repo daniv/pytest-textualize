@@ -1,26 +1,17 @@
-# Project : pytest-textualize
-# File Name : hook_message.py
-# Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
 from enum import StrEnum
 from typing import Literal
 from typing import TYPE_CHECKING
-# from typing import Any
-#
-# from typing import NoReturn
-# from typing import Type
 from typing import assert_never
 
 import pytest
 from rich import box
-
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.table import Column
 from rich.table import Table
 from rich.text import Text
-
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -41,8 +32,6 @@ class PrefixEnum(StrEnum):
     PREFIX_SQUARE = "▪"
     PREFIX_BULLET = "•"
     PREFIX_DASH = "-"
-    PREFIX_BIG_SQUARE = "■"
-    PREFIX_BIG_CIRCLE = "⬤"
     BLACK_CIRCLE = "●"
     LARGE_CIRCLE = "○"
     CIRCLED_BULLET = "⦿"
@@ -57,15 +46,13 @@ class TracerMessage:
         *,
         prefix: PrefixEnum = PrefixEnum.PREFIX_SQUARE,
         info: TextType | None = None,
-        escape: bool = False,
-        highlight: bool = False,
+        escape: bool = False
     ) -> None:
 
         self.hookname = hookname
         self.prefix = prefix
         self.info = info
         self.escape = escape
-        self.highlight = highlight
 
         self.info = info
         if isinstance(info, str):
@@ -73,21 +60,24 @@ class TracerMessage:
         else:
             self._info_text = info
 
-    def __call__(self, console: Console | None) -> Table | None:
+    def __call__(self, console: Console | None) -> list[str] | None:
         from rich.containers import Renderables
 
-        renderables: Iterable[ConsoleRenderable] = []
-        output = Table.grid(padding=(0, 1))
-        output.expand = True
+        prefix = f"[pyest.hook.prefix]{self.prefix}[/]"
+        tag = f"[pyest.hook.tag]{'hook:'.ljust(6)}[/]"
+        hook_name = f"[pyest.hook.name]{self.hookname.ljust(30)}[/]"
+        renderables: list[str] = [prefix, tag, hook_name]
+        # output = Table.grid(padding=(0, 1))
+        # output.expand = True
+        #
+        # hook_name = self.hookname.ljust(30)
+        # len_name = len(hook_name)
+        # output.add_column(style="pyest.hook.prefix", justify="right", width=1, max_width=1)
+        # output.add_column(style="pyest.hook.tag", justify="left", width=5, max_width=5)
+        # output.add_column(style="pyest.hook.name", width=len_name)
+        # output.add_column(ratio=1, style="pyest.hook.info", overflow="fold", highlight=self.highlight)
 
-        hook_name = self.hookname.ljust(30)
-        len_name = len(hook_name)
-        output.add_column(style="pyest.hook.prefix", justify="right", width=1, max_width=1)
-        output.add_column(style="pyest.hook.tag", justify="left", width=5, max_width=5)
-        output.add_column(style="pyest.hook.name", width=len_name)
-        output.add_column(ratio=1, style="pyest.hook.info", overflow="fold", highlight=self.highlight)
-
-        row: list[RenderableType] = [self.prefix, "hook:".ljust(6), self.hookname]
+        # row: list[RenderableType] = [prefix, "hook:".ljust(6), self.hookname]
 
         if self.info:
             from rich.markup import escape as markup_escape
@@ -107,13 +97,14 @@ class TracerMessage:
                 info.append(self._info_text)
             else:
                 assert_never(self.info)
-            renderables = [info]
+            renderables.append(info.markup)
 
-        row.append(Renderables(renderables))
-        output.add_row(*row)
-        if console is not None:
-            console.print(output, new_line_start=True)
-        return output
+        return renderables
+        # row.append(Renderables(renderables))
+        # output.add_row(*row)
+        # if console is not None:
+        #     console.print(output, new_line_start=True)
+        # return output
 
 
 class KeyValueMessage:
@@ -139,19 +130,28 @@ class KeyValueMessage:
         else:
             self._value_text = key_value
 
-    def __call__(self, console: Console | None) -> Table | None:
+    def __call__(self, console: Console | None) -> list[str]:
         from rich.containers import Renderables
         from rich.markup import escape as markup_escape
 
-        output = Table.grid(padding=(0, 1))
-        output.expand = True
 
-        output.add_column(style="#B0D9B1", justify="right", width=7, max_width=7)
-        output.add_column(style="#CBFFA9", justify="left")
-        # output.add_column(style="#FDFFAE", justify="left")
-        output.add_column(ratio=1, style=self.value_style, overflow="fold", highlight=self.highlight)
-        key_name = self.key_name.ljust(30)
-        row: list[RenderableType] = [self.prefix, key_name]
+        prefix = f"[#B0D9B1]{self.prefix.rjust(3)}[/]"
+        key_name = f"[#CBFFA9]{self.key_name.ljust(20)}[/]"
+        renderables: list[str] = [prefix, key_name]
+
+
+
+
+
+        # output = Table.grid(padding=(0, 1))
+        # output.expand = True
+        #
+        # output.add_column(style="#B0D9B1", justify="right", width=7, max_width=7)
+        # output.add_column(style="#CBFFA9", justify="left")
+        # # output.add_column(style="#FDFFAE", justify="left")
+        # output.add_column(ratio=1, style=self.value_style, overflow="fold", highlight=self.highlight)
+        # key_name = self.key_name.ljust(30)
+        # row: list[RenderableType] = [self.prefix, key_name]
 
         value_text = Text()
         if hasattr(self, "_value_str"):
@@ -161,17 +161,19 @@ class KeyValueMessage:
                 markup = Text.from_markup(self._value_str)
                 value_text.append(markup)
             else:
-                value_text.append(Text(self._value_str))
+                value_text.append(self._value_str, style=self.value_style)
         elif isinstance(self._value_text, Text):
             value_text.append(self._value_text)
         else:
             value_text = self._value_text
-        renderables: Iterable[ConsoleRenderable] = [value_text]
-        row.append(Renderables(renderables))
-        output.add_row(*row)
-        if console is not None:
-            console.print(output)
-        return output
+
+        renderables.append(value_text.markup)
+        return renderables
+        # row.append(Renderables(renderables))
+        # output.add_row(*row)
+        # if console is not None:
+        #     console.print(output)
+        # return output
 
 
 def pytest_textualize_header(console: Console) -> None:
@@ -194,7 +196,7 @@ def pytest_textualize_header(console: Console) -> None:
         expand=True,
         highlight=False,
     )
-
+    console.print("", style="reset", end="")
     console.print(panel, new_line_start=True)
 
 

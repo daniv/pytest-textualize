@@ -1,31 +1,22 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 from typing import Sequence
 
 import pytest
-from rich import box
-from rich.columns import Columns
 from rich.console import ConsoleRenderable
-from rich.console import Group
-from rich.console import render_scope
-from rich.markup import escape
-from rich.padding import Padding
 from rich.panel import Panel
-from rich.table import Table
 from rich.text import Text
 from rich.traceback import PathHighlighter
 from typing_extensions import assert_never
 
 from pytest_textualize import TextualizePlugins
-from pytest_textualize import highlighted_nodeid
-from pytest_textualize import hook_msg
-from pytest_textualize import key_value_scope
-from pytest_textualize import keyval_msg
+from pytest_textualize import trace_logger
+from pytest_textualize.textualize import key_value_scope
 from pytest_textualize.plugin.base import BaseTextualizePlugin
-from pytest_textualize.settings import Verbosity
-
+from pytest_textualize.textualize.verbose_log import Verbosity
+from pytest_textualize.textualize import highlighted_nodeid
+from pytest_textualize.textualize import hook_msg
 
 item_stash = pytest.StashKey[Panel]()
 
@@ -34,6 +25,7 @@ class TextualizeReporter(BaseTextualizePlugin):
 
     def __init__(self):
         self._path_highlighter = PathHighlighter()
+        self.console_logger = trace_logger()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name='{self.name}'>"
@@ -44,7 +36,7 @@ class TextualizeReporter(BaseTextualizePlugin):
 
     @pytest.hookimpl
     def pytest_configure(self, config: pytest.Config) -> None:
-        from pytest_textualize import report_pytest_textualize_header
+        from pytest_textualize.textualize import report_pytest_textualize_header
 
         super().configure(config)
 
@@ -62,12 +54,14 @@ class TextualizeReporter(BaseTextualizePlugin):
             info = f'pytest.File -> "{collector.nodeid}"'
         else:
             assert_never("unsupported collector")
-        hook_msg("pytest_make_collect_report", info=info, console=self.console)
+        results = hook_msg("pytest_make_collect_report", info=info)
+        self.console_logger.log(*results, verbosity=Verbosity.VERBOSE)
 
     @pytest.hookimpl
     def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
-        if self.verbosity > Verbosity.NORMAL:
-            hook_msg("pytest_collection_modifyitems", console=self.console)
+
+        results = hook_msg("pytest_collection_modifyitems")
+        self.console_logger.log(*results, verbosity=Verbosity.VERBOSE)
         return None
 
     @pytest.hookimpl
@@ -76,7 +70,8 @@ class TextualizeReporter(BaseTextualizePlugin):
             return None
 
         node_text = highlighted_nodeid(item)
-        hook_msg("pytest_itemcollected", info=node_text, console=self.console, highlight=True)
+        results = hook_msg("pytest_itemcollected", info=node_text, highlight=True)
+        self.console_logger.log(*results, verbosity=Verbosity.VERBOSE)
 
         markers = list(item.iter_markers())
         skip_markers = ", ".join([mark.name for mark in markers if mark.name.startswith("skip")])
@@ -115,8 +110,8 @@ class TextualizeReporter(BaseTextualizePlugin):
 
     @pytest.hookimpl(trylast=True)
     def pytest_unconfigure(self) -> None:
-        if self.verbosity > Verbosity.NORMAL:
-            hook_msg("pytest_unconfigure", console=self.console)
+        results = hook_msg("pytest_unconfigure")
+        self.console_logger.log(*results, verbosity=Verbosity.VERBOSE)
         self.config.pluginmanager.unregister(self, self.name)
 
     @pytest.hookimpl

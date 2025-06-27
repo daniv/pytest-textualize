@@ -109,7 +109,7 @@ def test_console_message_make_section_ml_indent() -> None:
 @parameterize(
     ("text", "expected_stripped"),
     [
-        param("[info]Hello, World![/info]", "Hello, World!", id="info"),
+        ("[info]Hello, World![/info]", "Hello, World!", id="info"),
         param("[b]Bold[/b]", "Bold", id="bold"),
         param("[i]Italic[/i]", "Italic", id="italic"),
     ],
