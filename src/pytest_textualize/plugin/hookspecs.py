@@ -39,3 +39,8 @@ def pytest_collect_env_info(config: pytest.Config) -> MutableMapping[str, Any] |
 @pytest.hookspec
 def pytest_plugin_unregistered(plugin: PytestPluginType) -> None:  # type:ignore[empty-body]
     pass
+
+
+@pytest.hookspec
+def pytest_stats_summary(config: pytest.Config, terminalreporter: pytest.TerminalReporter) -> None:
+    pass

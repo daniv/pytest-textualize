@@ -23,8 +23,10 @@ __all__ = (
     "settings_key",
     "collected_groups",
     "collect_only_report",
-    "ConsoleMessage",
-    "TextualizeRuntimeError"
+    "TextualizeRuntimeError",
+    "SummaryService",
+    "TextualizePluginRegistrationService",
+    "HeaderServiceManager"
 )
 
 from typing import NewType
@@ -46,12 +48,14 @@ from pytest_textualize.plugin.helpers.collectors import collected_tree
 from pytest_textualize.plugin.model import TestRunResults
 from pytest_textualize.plugin.plugin import skipif_no_console
 from pytest_textualize.plugin.runtest_tracer import RunTestTracer
+from pytest_textualize.plugin.services.header_data_collector import HeaderServiceManager
 from pytest_textualize.plugin.services.header_data_collector import PythonCollectorService
+from pytest_textualize.plugin.services.plugin_registration import TextualizePluginRegistrationService
+from pytest_textualize.plugin.services.summary import SummaryService
 from pytest_textualize.plugin.tracer import TextualizeTracer
 from pytest_textualize.plugin.textualize_reporter import (
     TextualizeReporter,
 )
-from pytest_textualize.plugin.exceptions import ConsoleMessage
 from pytest_textualize.plugin.exceptions import TextualizeRuntimeError
 
 

@@ -3,19 +3,17 @@
 # Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
+from pygments.token import Comment
+from pygments.token import Error
+from pygments.token import Generic
+from pygments.token import Keyword
+from pygments.token import Name
+from pygments.token import Number
+from pygments.token import Operator
+from pygments.token import String
+from pygments.token import Token
+from pygments.token import Whitespace
 from rich.color import Color
-from pygments.token import (
-    Comment,
-    Error,
-    Generic,
-    Keyword,
-    Name,
-    Number,
-    Operator,
-    String,
-    Token,
-    Whitespace,
-)
 from rich.style import Style
 from rich.syntax import ANSISyntaxTheme
 from rich.syntax import TokenType

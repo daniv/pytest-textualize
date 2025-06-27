@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import shlex
+import sys
 from contextlib import suppress
+from pathlib import Path
 from subprocess import CalledProcessError
 from typing import Any
 from typing import Self
@@ -10,10 +12,13 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from rich.highlighter import ReprHighlighter
 from rich.panel import Panel
 from rich.text import Text
+from rich.traceback import PathHighlighter
 
-from pytest_textualize import Verbosity
+from pytest_textualize import TS_BASE_PATH
+from pytest_textualize.textualize.verbose_log import Verbosity
 from pytest_textualize.textualize.console import is_markup
 
 if TYPE_CHECKING:
@@ -102,27 +107,51 @@ class PrettyException(BaseModel):
     exception: BaseException = Field(
         init=True, description="The original `CalledProcessError` instance."
     )
-    # location: tuple[str, int, str] = Field(default_factory=tuple, description="The location of the exception.", repr=False)
-    # cwd: Path = Field(default=Path.cwd(), description="Current project directory")
-    # exception: BaseException = Field(..., description="The original `CalledProcessError` instance.")
-    # indent: str = Field(default="", description="Indent prefix to use for inner content per section.", repr=False)
-    # isatty_link: str = Field(default="")
+    location: ConsoleMessage | None = Field(
+        default=None, description="A string representation of the location"
+    )
+    link: str | None = Field(default=None, description="A string representation of the location")
+    isatty_link: str | None = Field(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
         self.doc = ConsoleMessage(text=self.exception.__doc__, debug=True).make_section(
             "Exception doc", indent=self.indent
         )
-        self.message = ConsoleMessage(text=str(self.exception).strip(), debug=True).make_section(
+        r = ReprHighlighter()
+        self.message = ConsoleMessage(text=r(str(self.exception).strip()).markup, debug=True).make_section(
             "Exception", indent=self.indent
         )
-        # todo: maybe, since the location might be not the last frame info
-        # import traceback
-        # tf = traceback.extract_tb(self.exception.__traceback__)[-1]
-        # path = Path(tf.filename)
-        # file = path.relative_to(self.cwd).as_posix()
-        # link = f"{tf.filename}:{tf.lineno}"
-        # self.location = (file, tf.lineno, link)
-        # self.isatty_link = f"{path.as_posix()}:{tf.lineno}"
+
+        if type(self).__name__ == "PrettyCalledProcessError":
+            return None
+        h = PathHighlighter()
+        if isinstance(self.exception, SyntaxError):
+            frame_summary = self.exception
+            path = Path(frame_summary.filename).relative_to(TS_BASE_PATH)
+            loc = (
+                f"file: {h(path.as_posix()).markup}\n"
+                f"lineno: [repr.number]{frame_summary.lineno}[/]\n"
+                f"text: [python.string]{frame_summary.text.strip()}[/]\n"
+            )
+        else:
+            import traceback
+            frame_summary = traceback.extract_tb(self.exception.__traceback__)[-1]
+            path = Path(frame_summary.filename).relative_to(TS_BASE_PATH)
+            loc = (
+                f"file: {h(path.as_posix()).markup}\n"
+                f"function: [python.function]{frame_summary.name}[/]\n"
+                f"lineno: [repr.number]{frame_summary.lineno}[/]\n"
+                f"line: [#67A37C]{frame_summary.line}[/]\n"
+            )
+        if sys.stdout.isatty():
+            loc += f"location: [link={path}:{frame_summary.lineno}][blue]{path.name}:{frame_summary.lineno}[/link] <- click[/]"
+        self.link = f"{path}:{frame_summary.lineno}"
+        self.isatty_link = f"[link={path}:{frame_summary.lineno}]{path.name}:{frame_summary.lineno}[/link]"
+        self.location = ConsoleMessage(text=loc, debug=True).make_section(
+                "Crash Location", indent=self.indent
+        )
+
+        return None
 
 
 class PrettyCalledProcessError(PrettyException):
@@ -174,23 +203,33 @@ class TextualizeRuntimeError(TextualizeError):
         exc_typename: str,
         messages: list[ConsoleMessage] | None = None,
         exit_code: int = 1,
+        ctx: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(reason)
         self.exc_typename = exc_typename
         self.exit_code = exit_code
         self._messages = messages or []
         self._messages.insert(0, ConsoleMessage(text=reason))
+        self.ctx = ctx or {}
 
     def write(self, error_console: Console, verbose: Verbosity) -> None:
         """
         Write the error text to the provided IO iff there is any text to write.
         """
+        panel = self.render(verbose=verbose)
+        if panel:
+            error_console.print(p, style="bright_red")
+
+    def render(self, verbose: Verbosity) -> Panel | None:
+        """
+        Write the error text to the provided IO iff there is any text to write.
+        """
         debug = verbose >= Verbosity.NORMAL
         if text := self.get_text(debug=debug, strip=False):
-            p = Panel(
+            return Panel(
                 Text.from_markup(text), expand=False, title=f"[b]{self.exc_typename}[/b]", padding=1
             )
-            error_console.print(p, style="bright_red")
+        return None
 
     def get_text(self, debug: bool = False, indent: str = "", strip: bool = False) -> str:
         """
@@ -229,9 +268,10 @@ class TextualizeRuntimeError(TextualizeError):
     def create(
         cls,
         reason: str,
-        exception: CalledProcessError | Exception | None = None,
+        exception: CalledProcessError | BaseException | None = None,
         *,
         info: list[str] | str | ConsoleMessage | list[ConsoleMessage] | None = None,
+        ctx: dict[str, Any] | None = None,
     ) -> Self:
         """Create an instance of this class using the provided reason. If
         an exception is provided, this is also injected as a debug `ConsoleMessage`.
@@ -258,8 +298,13 @@ class TextualizeRuntimeError(TextualizeError):
             ]
         elif isinstance(exception, Exception):
             error = PrettyException(exception=exception, indent="    | ")
-            messages = [error.doc.style("white"), error.message, *messages]
-        return cls(reason, repr(type(exception)), messages)
+            ctx = {"link": error.link, "isatty.link": error.isatty_link}
+            messages = [
+                error.doc.style("white"), error.message,
+                error.location,
+                *messages
+            ]
+        return cls(reason, repr(type(exception)), messages, ctx=ctx)
 
     def append(self, message: str | ConsoleMessage) -> Self:
         if isinstance(message, str):

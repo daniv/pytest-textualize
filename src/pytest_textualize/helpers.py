@@ -8,36 +8,13 @@ from enum import Enum
 from typing import Any
 from typing import NoReturn
 from typing import Protocol
+from typing import TYPE_CHECKING
+from typing import TypeGuard
 from typing import TypeVar
 from typing import get_args
 
-Comp_T = TypeVar("Comp_T", bound="Comparable")
-
-
-class ToDictable(Protocol):
-    """Any object with a to_dict() method."""
-
-    def to_dict(self) -> dict[str, Any]:
-        """Converts this object to a dictionary."""
-
-
-class Comparable(Protocol):
-    """A type that can be compared and sorted."""
-
-    def __eq__(self, other: Any) -> bool:  # noqa: D105
-        pass
-
-    def __lt__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
-        pass
-
-    def __gt__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
-        pass
-
-    def __le__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
-        pass
-
-    def __ge__(self: Comp_T, other: Comp_T) -> bool:  # noqa: D105
-        pass
+if TYPE_CHECKING:
+    from pytest_textualize.typist import ListStr
 
 
 def get_bool_opt(opt_name: str, string: str) -> bool:
@@ -110,6 +87,9 @@ def literal_to_list(literal: Any) -> list[None | bool | bytes | int | str | Enum
 
     return result
 
+
+def is_list_of_strings(obj: object) -> TypeGuard[ListStr]:
+    return isinstance(obj, list) and all(isinstance(item, str) for item in obj)
 
 class SetEnv:
     """

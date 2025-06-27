@@ -15,10 +15,11 @@ from pydantic import TypeAdapter
 from pydantic_core import PydanticCustomError
 from rich.console import Console
 
-from pytest_textualize import Verbosity
-from pytest_textualize.settings import TextualizeSettings
+
 
 if TYPE_CHECKING:
+    from pytest_textualize.textualize.verbose_log import Verbosity
+    from pytest_textualize.settings import TextualizeSettings
     from pytest_textualize.plugin import PytestPluginType
 
 
@@ -33,6 +34,7 @@ class _BaseTextualizeSettingsPlugin(ABC):
 
     @classmethod
     def validate_settings(cls, settings: TextualizeSettings) -> TextualizeSettings | NoReturn:
+        from pytest_textualize.settings import TextualizeSettings
         return TypeAdapter(TextualizeSettings).validate_python(settings)
 
 
@@ -80,6 +82,10 @@ class BaseTextualizePlugin(_BaseRichConsolePlugin):
     @property
     def verbosity(self) -> Verbosity:
         return self.settings.verbosity
+
+    @property
+    def show_locals(self) -> bool:
+        return self.config.option.showlocals
 
     @cached_property
     def isatty(self) -> bool:

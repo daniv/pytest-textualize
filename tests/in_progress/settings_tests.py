@@ -29,6 +29,17 @@ if TYPE_CHECKING:
 parameterize = pytest.mark.parametrize
 
 
+def test_paths(pytestconfig: pytest.Config) -> None:
+    from pytest_textualize import TS_BASE_PATH, PYPROJECT_PATH, STATIC_PATH, STYLES_PATH, DOT_ENV_PATH, TESTS_PATH
+
+    assert_that(pytestconfig.rootpath, equal_to(TS_BASE_PATH), reason="base path")
+    assert_that(pytestconfig.inipath, equal_to(PYPROJECT_PATH), reason="pyproject path")
+    assert_that(STATIC_PATH.is_dir(), equal_to(True), reason="static path")
+    assert_that(STYLES_PATH.is_dir(), equal_to(True), reason="static path")
+    assert_that(DOT_ENV_PATH.is_file(), equal_to(True), reason=".env path")
+    assert_that(TESTS_PATH.is_dir(), equal_to(True), reason=".env path")
+
+
 @pytest.fixture(autouse=False, scope="module")
 def clean_environment() -> Generator[None, None, None]:
     """Cleans the environment variables"""

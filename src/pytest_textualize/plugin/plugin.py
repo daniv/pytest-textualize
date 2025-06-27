@@ -11,16 +11,17 @@ import pytest
 from pydantic import ValidationError
 
 from rich.console import Console
+from rich.control import Control
 
 from pytest_textualize import TextualizePlugins
-from pytest_textualize import Verbosity
+from pytest_textualize import config_trace_logger
 from pytest_textualize import console_factory
+from pytest_textualize.textualize.verbose_log import Verbosity
 from pytest_textualize import get_bool_opt
-
-from pytest_textualize.settings import TextualizeSettings
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pytest_textualize.settings import TextualizeSettings
     from pytest_textualize.helpers import SetEnv
     from _pytest._code import code as pytest_code
 
@@ -56,6 +57,7 @@ def pytest_configure(config: pytest.Config) -> None:
     from pytest_textualize.plugin import error_console_key
     from pytest_textualize.plugin import settings_key
     from pytest_textualize.plugin.base import BaseTextualizePlugin
+    from pytest_textualize.settings import TextualizeSettings
 
     # -- validates that the plugin option was set to true
     if not config.getoption("--textualize", False, skip=True):
@@ -91,8 +93,8 @@ def pytest_configure(config: pytest.Config) -> None:
     if config.option.verbose < 0:
         _stream_console.quiet = True
     config.stash.setdefault(console_key, _stream_console)
-    from rich.control import Control
-    Control.title(PLUGIN_NAME)
+    # -- setting the terminal title o the plugin name
+    _stream_console.control(Control.title(PLUGIN_NAME))
 
     _error_stream_console = console_factory(config=config, instance="stderr")
     config.stash.setdefault(error_console_key, _error_stream_console)
@@ -101,6 +103,12 @@ def pytest_configure(config: pytest.Config) -> None:
     from pytest_textualize.textualize.theme.syntax import PYCHARM_DARK
     from rich.syntax import RICH_SYNTAX_THEMES
     RICH_SYNTAX_THEMES["pycharm_dark"] = PYCHARM_DARK
+
+    # -- configuring the console internal logger
+    log = config_trace_logger(verbosity=config.option.verbose, showlocals=config.option.showlocals)
+    log.settings(_settings)
+    log.add_console(_stream_console)
+    log.add_console(_error_stream_console)
 
     # -- after having all configuration we start the logging handler
     from pytest_textualize import configure_logging

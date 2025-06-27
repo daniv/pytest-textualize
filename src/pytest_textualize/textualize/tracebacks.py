@@ -1,6 +1,3 @@
-# Project : pytest-textualize
-# File Name : tracebacks.py
-# Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
 import os
