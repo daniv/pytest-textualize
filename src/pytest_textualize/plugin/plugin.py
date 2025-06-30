@@ -190,10 +190,18 @@ def force_color() -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def turnoff_legacy_windows() -> Generator[None, None, None]:
-    with patch("rich.console.detect_legacy_windows", return_value=False):
-        yield
+def init_settings(pytestconfig: pytest.Config, opt_textualize: bool) -> TextualizeSettingsType:
+    from dotenv import load_dotenv
+    from pathlib import Path
+    from pytest_textualize.settings import TextualizeSettings
 
+    if opt_textualize:
+        # loading environment variable fro file, based on ini value env_file, skipped if not exists
+        ini_env_file = pytestconfig.getini("env_file")
+        if Path(ini_env_file).is_file():
+            load_dotenv(ini_env_file, verbose=True)
+        ts = TextualizeSettings(pytestconfig=pytestconfig)
+        pytestconfig.stash[settings_key] = ts
 
 @pytest.fixture
 def env() -> Generator[SetEnv, None, None]:
