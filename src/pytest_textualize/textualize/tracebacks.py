@@ -1,29 +1,37 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
+# noinspection PyProtectedMember
+from _pytest._code import ExceptionInfo
+
+# noinspection PyProtectedMember
+from _pytest._code import code as pytest_code
 from rich.columns import Columns
-from rich.console import ConsoleRenderable
 from rich.console import group
 from rich.syntax import Syntax
-from rich.traceback import Traceback
+from rich.traceback import Frame
+from rich.traceback import Stack
+from rich.traceback import Trace
+from rich.traceback import Traceback as RichTraceback
+
+from pytest_textualize import Textualize
 
 if TYPE_CHECKING:
-    from typing import Iterable
+    from collections.abc import Callable
+    from collections.abc import Iterable
+    from pytest_textualize.typist import PytestExceptionInfoType
     from rich.console import RenderResult
-    from rich.traceback import Stack
-    from rich.traceback import Frame
-    from rich.traceback import Trace
+    from rich.console import ConsoleRenderable
 
 
-class TextualizeTraceback(Traceback):
-    def __init__(self, trace: Trace | None = None, **kwargs):
+class RichTraceback(RichTraceback):
+    def __init__(self, trace: Trace | None = None, **kwargs) -> None:
         super().__init__(trace, **kwargs)
 
     @group()
     def _render_stack(self, stack: Stack) -> RenderResult:
+        from rich.console import render_markup
         import linecache
         from rich.scope import render_scope
         from rich.text import Text
@@ -67,10 +75,12 @@ class TextualizeTraceback(Traceback):
             frame_filename = frame.filename
             suppressed = any(frame_filename.startswith(path) for path in self.suppress)
 
-            if os.path.exists(frame.filename):
-                posix = Path(frame.filename).as_posix()
+            frame_filename_path = Textualize.to_pathlib(frame.filename)
+
+            if frame_filename_path.exists():
+                posix = frame_filename_path.as_posix()
                 content = f"{frame.filename}:{frame.lineno} in {frame.name}"
-                text = Text.from_markup(
+                text = render_markup(
                     f"[blue bold][link={posix}:{frame.lineno}]{content}[/link][/]",
                     style="pygments.text",
                 )
@@ -146,3 +156,29 @@ class TextualizeTraceback(Traceback):
                         if frame.locals
                         else syntax
                     )
+
+
+class TextualizeTracebacks:
+
+    @staticmethod
+    def get_repr(
+        showlocals: bool = False,
+        style: pytest_code.TracebackStyle = "long",
+        abspath: bool = False,
+        tb_filter: (
+            bool | Callable[[PytestExceptionInfoType[BaseException]], pytest_code.Traceback]
+        ) = True,
+        func_args: bool = False,
+        truncate_locals: bool = True,
+        truncate_args: bool = True,
+        chain: bool = True,
+    ) -> pytest_code.ReprExceptionInfo:
+        pass
+
+    @staticmethod
+    def from_exception(exception: BaseException) -> ExceptionInfo[BaseException]:
+        return ExceptionInfo.from_exception(exception)
+
+    @staticmethod
+    def from_current(exprinfo: str | None = None) -> ExceptionInfo[BaseException]:
+        pass

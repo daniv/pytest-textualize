@@ -1,13 +1,10 @@
-# Project : pytest-textualize
-# File Name : header_renderer.py
-# Dir Path : src/pytest_textualize/plugins/pytest_richtrace/services
 from __future__ import annotations
 
 import textwrap
-from collections import ChainMap
 from pathlib import Path
 from pprint import saferepr
 from typing import Any
+from typing import ChainMap
 from typing import TYPE_CHECKING
 from typing import assert_never
 from typing import cast
@@ -20,18 +17,18 @@ from rich.pretty import Pretty
 from rich.scope import render_scope
 from rich.table import Table
 from rich.text import Text
-from rich.traceback import PathHighlighter
 
-from pytest_textualize import ArgparseArgsHighlighter
+from pytest_textualize.factories.theme_factory import ThemeFactory
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
+    from pytest_textualize.typist import TableType
     from rich.console import ConsoleRenderable
 
 
-def header_console_renderable(config: pytest.Config, data: MutableMapping[str, Any]) -> Table:
-    argparse_h = ArgparseArgsHighlighter()
-    path_h = PathHighlighter()
+def header_console_renderable(config: pytest.Config, data: MutableMapping[str, Any]) -> TableType:
+    argparse_h = ThemeFactory.argparse_highlighter()
+    path_h = ThemeFactory.path_highlighter()
     traceconfig = config.option.traceconfig
 
     words = lambda x: str(x).replace("_", " ")
@@ -48,7 +45,7 @@ def header_console_renderable(config: pytest.Config, data: MutableMapping[str, A
     table.add_column(width=25, justify="left", style="#B0DB9C", max_width=25)
 
     for key_name in chain_map.fromkeys(
-            ["platform", "textualize_version", "pytest_version", "plugins", "packages"]
+        ["platform", "textualize_version", "pytest_version", "plugins", "packages"]
     ):
         if data.get(key_name) is None:
             continue
@@ -77,9 +74,7 @@ def header_console_renderable(config: pytest.Config, data: MutableMapping[str, A
                     )
 
             case "textualize_version":
-                table.add_row(
-                    title(key_name), Text(getval(data, key_name), style="pytest.version")
-                )
+                table.add_row(title(key_name), Text(getval(data, key_name), style="pytest.version"))
                 table.add_row(
                     title("poetry_version"),
                     Text(getval(data, "poetry_version"), style="pytest.version"),
@@ -134,8 +129,8 @@ def header_console_renderable(config: pytest.Config, data: MutableMapping[str, A
 
 
 def render_registered_plugins(title, dists: list[dict[str, str]], trace: bool) -> ConsoleRenderable:
-    path_highlighter = PathHighlighter()
-    
+    path_highlighter = ThemeFactory.path_highlighter()
+
     if trace:
         table = _get_plugins_table(title)
         for d in dists:
@@ -155,13 +150,16 @@ def render_registered_plugins(title, dists: list[dict[str, str]], trace: bool) -
             justify="center",
         )
 
-    plugin_renderables = [Panel(get_content(dist), expand=True, border_style="scope.border") for dist in dists]
+    plugin_renderables = [
+        Panel(get_content(dist), expand=True, border_style="scope.border") for dist in dists
+    ]
     return Columns(plugin_renderables)
 
 
 def render_active_plugins(title, plugins: list[dict[str, str]]) -> ConsoleRenderable:
     from boltons.strutils import multi_replace
-    path_highlighter = PathHighlighter()
+
+    path_highlighter = ThemeFactory.path_highlighter()
 
     table = _get_plugins_table(title)
     for plugin in plugins:
@@ -172,7 +170,9 @@ def render_active_plugins(title, plugins: list[dict[str, str]]) -> ConsoleRender
         else:
             repr_ = textwrap.shorten(saferepr(plugin.get("plugin")), width=110)
             repr_ = multi_replace(repr_, {"'": "", '"': ""})
-            table.add_row(f"[scope.key_ni]{plugin.get("name")}[/]", f"[poetry.description]{repr_}[/]")
+            table.add_row(
+                f"[scope.key_ni]{plugin.get("name")}[/]", f"[poetry.description]{repr_}[/]"
+            )
     return table
 
 
@@ -193,7 +193,8 @@ def render_packages(packages: list[dict[str, str]]) -> ConsoleRenderable:
 
 def render_options_table(config: pytest.Config) -> ConsoleRenderable:
     from itertools import batched
-    path_highlighter = PathHighlighter()
+
+    path_highlighter = ThemeFactory.path_highlighter()
 
     table = Table(
         box=box.DOUBLE_EDGE,
@@ -237,7 +238,9 @@ def render_options_table(config: pytest.Config) -> ConsoleRenderable:
             st_value = render_value(st, options[st])
             nd_value = render_value(nd, options[nd])
             pass
-            table.add_row(Text(st, style="scope.key"), st_value, Text(nd, style="scope.key"), nd_value)
+            table.add_row(
+                Text(st, style="scope.key"), st_value, Text(nd, style="scope.key"), nd_value
+            )
 
     return table
 

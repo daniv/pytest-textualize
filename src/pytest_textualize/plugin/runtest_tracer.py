@@ -4,20 +4,19 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+
 from pytest_textualize import TextualizePlugins
 from pytest_textualize.plugin.base import BaseTextualizePlugin
 
 if TYPE_CHECKING:
-    from pytest_textualize.plugin import TestRunResults
+    from pytest_textualize.typist import TestRunResultsType
 
 
 class RunTestTracer(BaseTextualizePlugin):
 
     name = TextualizePlugins.RUNTEST_TRACER
 
-    results: TestRunResults
-
-    def __init__(self, results: TestRunResults):
+    def __init__(self, results: TestRunResultsType):
         self.results = results
         self.pluginmanager: pytest.PytestPluginManager | None = None
         self._started = False

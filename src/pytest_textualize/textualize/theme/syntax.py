@@ -1,6 +1,3 @@
-# Project : pytest-textualize
-# File Name : syntax.py
-# Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
 from pygments.token import Comment
@@ -17,38 +14,74 @@ from rich.color import Color
 from rich.style import Style
 from rich.syntax import ANSISyntaxTheme
 from rich.syntax import TokenType
+from rich.console import Console
+
 
 PYCHARM_DARK: dict[TokenType, Style] = {
     Token: Style(),
-    Whitespace: Style(color="bright_black"),
+    Whitespace: Style(color=Color.parse("#FFB8E0")),
     Comment: Style(dim=True),
-    Comment.Preproc: Style(color="bright_cyan"),
-    Keyword: Style(color=Color.from_rgb(207, 142, 109)),
-    Keyword.Type: Style(color="bright_cyan"),
-    Operator.Word: Style(color="bright_magenta"),
-    Name.Builtin: Style(color="bright_cyan"),
-    Name.Function: Style(color="bright_green"),
-    Name.Namespace: Style(color="bright_cyan"),
-    Name.Class: Style(color=Color.from_rgb(207, 142, 109)),
-    Name.Exception: Style(color=Color.parse("#8888C6"), bold=True),
-    Name.Decorator: Style(color=Color.parse("#B3AE60"), bold=True),
-    Name.Variable: Style(color="bright_red"),
+    Comment.Preproc: Style(color=Color.parse("#ffb8e0")),
+    Keyword: Style(color=Color.parse("#CF8E6D")),  # def, if , raise, else
+    Keyword.Type: Style(color=Color.parse("#ffb8e0")),
+    Operator.Word: Style(color=Color.parse("#CF8E6D"), bold=True),  # and or, not
+    Name.Builtin: Style(color=Color.parse("#8888C6")),  # bool, int , float, str
+    Name.Function: Style(color=Color.parse("#56A8F5")),  # function names
+    Name.Namespace: Style(color=Color.parse("#BCBEC4")),
+    Name.Class: Style(color=Color.parse("#BCBEC4")),
+    Name.Exception: Style(color=Color.parse("#8888C6"), bold=True),  # exceptions
+    Name.Decorator: Style(color=Color.parse("#B3AE60"), bold=False),
     Name.Funcion.Magic: Style(color=Color.parse("#B200B2")),
-    Name.Constant: Style(color="bright_red"),
-    Name.Attribute: Style(color="bright_cyan"),
-    Name.Tag: Style(color="bright_blue"),
-    String: Style(color=Color.parse("#6AAB73")),
-    Number: Style(color=Color.from_rgb(42, 172, 184)),
-    Generic.Deleted: Style(color="bright_red"),
-    Generic.Inserted: Style(color="bright_green"),
+    Name.Variable: Style(color=Color.parse("#B200B2")),  # __class__, __name___
+    Name.Constant: Style(color=Color.parse("bright_green")),
+    Name.Attribute: Style(color=Color.parse("#ffb8e0")),
+    Name.Tag: Style(color=Color.parse("bright_green")),
+    String: Style(color=Color.parse("#6AAB73")),  # strings
+    Number: Style(color=Color.parse("#2AACB8")),  # numbers
+    Generic.Deleted: Style(color=Color.parse("#11b8e0")),
+    Generic.Inserted: Style(color=Color.parse("#ffb8e0")),
     Generic.Heading: Style(bold=True),
-    Generic.Subheading: Style(color="bright_magenta", bold=True),
+    Generic.Subheading: Style(color=Color.parse("#ffb8e0"), bold=True),
     Generic.Prompt: Style(bold=True),
-    Generic.Error: Style(color="bright_red"),
-    Error: Style(color="red"),
+    Generic.Error: Style(color=Color.parse("#ffb8e0")),
+    Error: Style(color=Color.parse("bright_green"), underline=True),
 }
 
 
 class RichTextualizeSyntaxTheme(ANSISyntaxTheme):
     def __init__(self) -> None:
         super().__init__(PYCHARM_DARK)
+
+
+def syntax_compare(file: str, console: Console) -> None:
+    import linecache
+    from rich.syntax import Syntax
+
+    code_lines = linecache.getlines(file)
+    code = "".join(code_lines)
+    syntax = Syntax(
+        code,
+        lexer="python",
+        code_width=console.width - 20,
+        line_numbers=True,
+        theme=Syntax.get_theme("ansi_dark"),
+        indent_guides=True,
+        highlight_lines={3},
+        padding=1,
+        start_line=1,
+        dedent=False,
+    )
+    # console.print(syntax)
+    syntax = Syntax(
+        code,
+        lexer="python",
+        code_width=console.width - 20,
+        line_numbers=True,
+        theme=Syntax.get_theme("pycharm_dark"),
+        indent_guides=True,
+        highlight_lines={3},
+        padding=1,
+        start_line=1,
+        dedent=True,
+    )
+    console.print(syntax)

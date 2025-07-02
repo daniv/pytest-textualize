@@ -74,42 +74,42 @@ def test__init__str(prefix: PrefixEnum | None, info: str | None, escape: bool | 
 
 
 
-@skipif_no_console
-@parameterize(
-    "prefix",
-    [
-        PrefixEnum.PREFIX_SQUARE,
-        PrefixEnum.PREFIX_BULLET,
-        PrefixEnum.PREFIX_DASH,
-        PrefixEnum.PREFIX_BIG_SQUARE,
-        PrefixEnum.PREFIX_BIG_CIRCLE,
-        PrefixEnum.BLACK_CIRCLE,
-        PrefixEnum.LARGE_CIRCLE,
-        PrefixEnum.CIRCLED_BULLET,
-        PrefixEnum.CIRCLED_WHITE_BULLET,
-        PrefixEnum.NARY_BULLET,
-    ],
-    ids=[
-        "prefix_square",
-        "prefix_bullet",
-        "prefix_dash",
-        "prefix_big_square",
-        "prefix_big_circle",
-        "black_circle",
-        "large_circle",
-        "circled_bullet",
-        "circled_white_bullet",
-        "nary_bullet",
-    ],
-)
-def test_different_prefixes(
-    request: pytest.FixtureRequest, console: Console | None, prefix: PrefixEnum
-) -> None:
-    info = f"i am PrefixEnum.'{request.node.callspec.id.upper()}' prefix"
-    tr_msg = hook_msg("pytest_configure", info=info, prefix=prefix)
-    assert_that(tr_msg.prefix, equal_to(prefix), reason="prefix")
-    console.line(1)
-    tr_msg(console)
+# @skipif_no_console
+# @parameterize(
+#     "prefix",
+#     [
+#         PrefixEnum.PREFIX_SQUARE,
+#         PrefixEnum.PREFIX_BULLET,
+#         PrefixEnum.PREFIX_DASH,
+#         PrefixEnum.PREFIX_BIG_SQUARE,
+#         PrefixEnum.PREFIX_BIG_CIRCLE,
+#         PrefixEnum.BLACK_CIRCLE,
+#         PrefixEnum.LARGE_CIRCLE,
+#         PrefixEnum.CIRCLED_BULLET,
+#         PrefixEnum.CIRCLED_WHITE_BULLET,
+#         PrefixEnum.NARY_BULLET,
+#     ],
+#     ids=[
+#         "prefix_square",
+#         "prefix_bullet",
+#         "prefix_dash",
+#         "prefix_big_square",
+#         "prefix_big_circle",
+#         "black_circle",
+#         "large_circle",
+#         "circled_bullet",
+#         "circled_white_bullet",
+#         "nary_bullet",
+#     ],
+# )
+# def test_different_prefixes(
+#     request: pytest.FixtureRequest, console: Console | None, prefix: PrefixEnum
+# ) -> None:
+#     info = f"i am PrefixEnum.'{request.node.callspec.id.upper()}' prefix"
+#     tr_msg = hook_msg("pytest_configure", info=info, prefix=prefix)
+#     assert_that(tr_msg.prefix, equal_to(prefix), reason="prefix")
+#     console.line(1)
+#     tr_msg(console)
 
 
 def test__init__str_info(console: Console | None, capsys: pytest.CaptureFixture[str]) -> None:

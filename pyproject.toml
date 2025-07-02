@@ -19,7 +19,8 @@ dependencies = [
     "rich-argparse-plus (>=0.3.1.4,<0.4.0.0)",
     "semver (>=3.0.4,<4.0.0)",
     "lore (>=0.8.6,<0.9.0)",
-    "lorem (>=0.1.1,<0.2.0)"
+    "lorem (>=0.1.1,<0.2.0)",
+    "requests (>=2.32.4,<3.0.0)"
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -85,9 +86,11 @@ line_length = 100
 
 [tool.pytest.ini_options]
 minversion = "8.3"
-verbosity_assertions = 0
+testpaths = ["tests"]
+
+#enable_assertion_pass_hook = false
 norecursedirs = [".*", "src", "static", "helpers", "in_progress"]
-log_level = "ERROR"
+log_level = "NOTSET"
 log_format = "%(message)s"
 log_date_format = "[%X]"
 addopts = [
@@ -98,7 +101,6 @@ addopts = [
 color_system = "truecolor"
 force_terminal = true
 legacy_windows = false
-log_time = false
 
 [tool.textualize-settings.tracebacks]
 theme = "pycharm_dark"
