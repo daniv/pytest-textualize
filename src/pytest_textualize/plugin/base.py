@@ -1,6 +1,3 @@
-# Project : pytest-textualize
-# File Name : base.py
-# Dir Path : src/pytest_textualize/plugins/pytest_richtrace
 from __future__ import annotations
 
 import sys
@@ -11,20 +8,48 @@ from typing import NoReturn
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import BaseModel
 from pydantic import TypeAdapter
-from pydantic_core import PydanticCustomError
+from pydantic import field_validator
 from rich.console import Console
 
-
+from pytest_textualize import Verbosity
 
 if TYPE_CHECKING:
-    from pytest_textualize.textualize.verbose_log import Verbosity
-    from pytest_textualize.settings import TextualizeSettings
-    from pytest_textualize.plugin import PytestPluginType
+    from argparse import Namespace as NamespaceType
+    from pytest_textualize.typist import PytestPluginType
+    from pytest_textualize.typist import TextualizeSettingsType
+    from pytest_textualize.typist import VerboseLoggerType
+
+
+# noinspection PyNestedDecorators
+class ValidateConsole(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
+    console_stderr: Console
+    console_stdout: Console
+
+    @field_validator("console_stdout", mode="after")
+    @classmethod
+    def validate_stdout(cls, console: Console) -> Console:
+        if console.stderr:
+            raise TypeError(
+                f"Expected Console.file stream name to be <stdout> however is {c.file.name}"
+            )
+        return console
+
+    @field_validator("console_stderr", mode="after")
+    @classmethod
+    def validate_stderr(cls, console: Console) -> Console:
+        if not console.stderr:
+            raise TypeError(
+                f"Expected Console.file stream name to be <stderr> however is {console.file.name}"
+            )
+        return console
 
 
 class _BaseTextualizeSettingsPlugin(ABC):
-    settings: TextualizeSettings | None = None
+    settings: TextualizeSettingsType | None = None
 
     def configure(self, config: pytest.Config) -> None:
         from pytest_textualize.plugin import settings_key
@@ -33,42 +58,44 @@ class _BaseTextualizeSettingsPlugin(ABC):
         self.settings = self.validate_settings(settings)
 
     @classmethod
-    def validate_settings(cls, settings: TextualizeSettings) -> TextualizeSettings | NoReturn:
+    def validate_settings(
+        cls, settings: TextualizeSettingsType
+    ) -> TextualizeSettingsType | NoReturn:
         from pytest_textualize.settings import TextualizeSettings
+
         return TypeAdapter(TextualizeSettings).validate_python(settings)
 
 
-class _BaseRichConsolePlugin(_BaseTextualizeSettingsPlugin, ABC):
+class BaseTextualizePlugin(_BaseTextualizeSettingsPlugin):
+    config: pytest.Config | None = None
+    verbose_logger: VerboseLoggerType | None = None
     console: Console | None = None
 
     def configure(self, config: pytest.Config) -> None:
         from pytest_textualize.plugin import console_key
+        from pytest_textualize.plugin import error_console_key
+        from pytest_textualize.textualize.logging import VerboseLogger
 
-        super().configure(config)
-        console = config.stash.get(console_key, None)
-        self.console = _BaseRichConsolePlugin.validate_console(console)
-
-    @classmethod
-    def validate_console(cls, console: Console) -> Console | NoReturn:
-        if console is None or isinstance(console, Console) is False:
-            raise PydanticCustomError(
-                error_type="is_subclass_of",
-                message_template="input should be a subclass of {subclass}",
-                context={
-                    "subclass": Console.__name__,
-                    "input_type": type(console),
-                    "input_value": console,
-                },
-            )
-        return console
-
-
-class BaseTextualizePlugin(_BaseRichConsolePlugin):
-    config: pytest.Config | None = None
-
-    def configure(self, config: pytest.Config) -> None:
         super().configure(config)
         self.config = config
+
+        stdout = config.stash.get(console_key, None)
+        stderr = config.stash.get(error_console_key, None)
+        consoles = ValidateConsole(console_stderr=stderr, console_stdout=stdout)
+        self.console = consoles.console_stdout
+
+        self.verbose_logger = VerboseLogger(config)
+        self.verbose_logger.add_console("<stdout>", consoles.console_stdout)
+        self.verbose_logger.add_console("<stderr>", consoles.console_stderr)
+
+    @cached_property
+    def my_property(self):
+        print("Computing my_property")
+        return "cached_value"
+
+    @property
+    def options(self) -> NamespaceType:
+        return self.config.option
 
     @property
     @abstractmethod
@@ -76,21 +103,33 @@ class BaseTextualizePlugin(_BaseRichConsolePlugin):
         raise NotImplementedError
 
     @property
+    def tb_style(self) -> str:
+        return self.options.tbstyle
+
+    @property
     def traceconfig(self) -> bool:
-        return self.config.option.traceconfig
+        return self.options.traceconfig
 
     @property
     def verbosity(self) -> Verbosity:
-        return self.settings.verbosity
-
-    @property
-    def show_locals(self) -> bool:
-        return self.config.option.showlocals
+        return Verbosity(self.config.option.verbose)
 
     @cached_property
     def isatty(self) -> bool:
         return sys.stdout.isatty()
 
+    @property
+    def showcapture(self) -> bool:
+        return self.options.showcapture
+
+    def has_opt(self, char: str) -> bool:
+        from _pytest.terminal import getreportopt
+
+        report_chars = getreportopt(self.config)
+        char = {"xfailed": "x", "skipped": "s"}.get(char, char)
+        return char in report_chars
+
     def cleanup_factory(self, plugin: PytestPluginType) -> None:
-        from pytest_textualize.plugin import cleanup_factory
+        from pytest_textualize import cleanup_factory
+
         self.config.add_cleanup(cleanup_factory(self.config.pluginmanager, plugin))

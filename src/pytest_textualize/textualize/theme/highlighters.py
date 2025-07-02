@@ -1,14 +1,7 @@
-# Project : pytest-textualize
-# File Name : highlighters.py
-# Dir Path : src/pytest_textualize/textualize/theme
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from rich.highlighter import RegexHighlighter
-
-if TYPE_CHECKING:
-    pass
+from glom import glom
 
 
 class ArgparseArgsHighlighter(RegexHighlighter):
@@ -19,11 +12,6 @@ class ArgparseArgsHighlighter(RegexHighlighter):
     ]
 
 
-class NodeItemHighlighter(RegexHighlighter):
-    base_style = "pytest."
-    highlights = [r"(?P<node_path>.*/)(?P<node_name>.+)"]
-
-
 class BuiltInsExceptionsHighlighter(RegexHighlighter):
     base_style = "exc."
 
@@ -32,8 +20,6 @@ class BuiltInsExceptionsHighlighter(RegexHighlighter):
     # noinspection PyUnresolvedReferences
     @classmethod
     def add_highlights(cls) -> None:
-        from pygments.lexers.python import Python2Lexer
-        from glom import glom
 
         tokens = Python2Lexer.tokens
         prefix = glom(tokens, "builtins.2.0.prefix")

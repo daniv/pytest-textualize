@@ -1,44 +1,43 @@
-# Project : pytest-textualize
-# File Name : settings.py
-# Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
 import logging
 from abc import ABC
 from collections.abc import Iterable
 from collections.abc import Mapping
-from enum import IntEnum
 from pathlib import Path
 from typing import Any
-from typing import Final
 from typing import Literal
 from typing import TYPE_CHECKING
 
 import pytest
-from boltons import fileutils
 from glom import glom
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import FilePath
+from pydantic import PositiveInt
 from pydantic import PrivateAttr
+from pydantic import TypeAdapter
 from pydantic_settings import BaseSettings
 from pydantic_settings import PydanticBaseSettingsSource
 from pydantic_settings import PyprojectTomlConfigSettingsSource
 from pydantic_settings import SettingsConfigDict
 from pydantic_settings import TomlConfigSettingsSource
-from pytest_textualize.textualize.verbose_log import Verbosity
+from rich.syntax import ANSISyntaxTheme
+from rich.syntax import Syntax
+from rich.theme import Theme
+from rich_argparse_plus.themes import ARGPARSE_COLOR_THEMES
+
+from pytest_textualize import TS_BASE_PATH
 
 if TYPE_CHECKING:
-    from rich.syntax import ANSISyntaxTheme
-    from rich.syntax import SyntaxTheme
-    from rich.theme import Theme
-
-    # noinspection PyProtectedMember
-    from pydantic.fields import FieldInfo
+    from pytest_textualize.typist import SyntaxThemeType
+    from pytest_textualize.typist import ThemeType
 
 
 EmojiVariant = Literal["emoji", "text"]
 ColorSystemVariant = Literal["auto", "standard", "256", "truecolor", "windows"]
+_ENV_FILE_INI_KEY = "env_file"
 
 STYLE_INI_FILES: Mapping[str, Path] = {
     "truecolor": Path("static/styles") / "truecolor_styles.cfg",
@@ -67,7 +66,6 @@ def locate(filename: str, cwd: Path | None = None) -> Path:
             return requested_file
 
     raise FileNotFoundError(f"Could not located the file '{filename}'")
-
 
 
 class ConsolePyProjectSettingsModel(BaseModel):
@@ -139,11 +137,7 @@ class ConsolePyProjectSettingsModel(BaseModel):
     def environ(self) -> Mapping[str, str]:
         return {"COLUMNS": "200", "LINES": "25"}
 
-    def get_theme(self, color_system: ColorSystemVariant) -> Theme:
-        from pydantic import TypeAdapter
-        from pydantic import FilePath
-
-        from rich.theme import Theme
+    def get_theme(self, color_system: ColorSystemVariant) -> ThemeType:
 
         if color_system == "truecolor":
             path = STYLE_INI_FILES.get("truecolor")
@@ -151,8 +145,6 @@ class ConsolePyProjectSettingsModel(BaseModel):
             path = STYLE_INI_FILES.get("standard")
         else:
             path = STYLE_INI_FILES.get("eight_bit")
-
-        from rich_argparse_plus.themes import ARGPARSE_COLOR_THEMES
 
         filepath = locate(str(path))
         argparse_theme = Theme(ARGPARSE_COLOR_THEMES.get(self.argparse_theme), inherit=False)
@@ -163,11 +155,11 @@ class ConsolePyProjectSettingsModel(BaseModel):
 
 
 class TracebacksAbstractModel(BaseModel, ABC):
-    locals_max_string: int = Field(
+    locals_max_string: PositiveInt = Field(
         default=80, description="Maximum length of string before truncating.", ge=20
     )
 
-    locals_max_length: int = Field(
+    locals_max_length: PositiveInt = Field(
         default=10, description="Maximum length of containers before abbreviating.", ge=1, le=20
     )
 
@@ -180,13 +172,13 @@ class TracebacksPyProjectSettingsModel(TracebacksAbstractModel):
         validate_assignment=True,
         extra="forbid",
     )
-    width: int = Field(
+    width: PositiveInt = Field(
         default=100, description="Number of characters used to traceback. Defaults to 100."
     )
-    code_width: int = Field(
+    code_width: PositiveInt = Field(
         default=88, description="Number of code characters used to render tracebacks.", gt=80
     )
-    extra_lines: int = Field(
+    extra_lines: PositiveInt = Field(
         default=3, description="Additional lines of code to render tracebacks.", ge=0
     )
     theme: str = Field(
@@ -212,26 +204,22 @@ class TracebacksPyProjectSettingsModel(TracebacksAbstractModel):
             description="Optional sequence of modules or paths to exclude from traceback.",
         ),
     )
-    max_frames: int = Field(
+    max_frames: PositiveInt = Field(
         default=100,
         title="Max Frames",
         description="Maximum number of frames returned by traceback.",
         ge=1,
     )
 
-    _syntax_theme: SyntaxTheme | None = PrivateAttr(default=None)
+    _syntax_theme: SyntaxThemeType | None = PrivateAttr(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
         if self.theme == "pycharm_dark":
-            from rich.syntax import SyntaxTheme
-            from rich.syntax import ANSISyntaxTheme
 
             from pytest_textualize.textualize.theme.syntax import PYCHARM_DARK
 
             self._syntax_theme = ANSISyntaxTheme(PYCHARM_DARK)
         else:
-            from rich.syntax import Syntax
-
             self._syntax_theme = Syntax.get_theme(self._syntax_theme)
 
 
@@ -283,6 +271,7 @@ class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
         default=88,
         description="Number of code characters used to render tracebacks, or None for full width. Defaults to 88.",
     )
+
     tracebacks_extra_lines: int = Field(
         default=3,
         description="Additional lines of code to render tracebacks, or None for full width. Defaults to None.",
@@ -310,9 +299,13 @@ class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
         description="Optional maximum number of frames returned by traceback. Default to 100",
     )
 
-    log_time_format: str | None = Field(
+    log_time_format: str = Field(
         default="[%x %X]",
-        description="If log_time is enabled, a string for strftime or callable that formats the time. Defaults to '[%x %X]'",
+        description="If log_time is enabled, a string for strftime Defaults to '[%x %X]'",
+    )
+
+    log_format: str | None = Field(
+        default="%(message)s", description="The logging.formatter template"
     )
 
     keywords: list[str] | None = Field(
@@ -321,7 +314,6 @@ class LoggingPyProjectSettingsModel(TracebacksAbstractModel):
     )
 
     def get_field_value(self, field: FieldInfo, field_name: str) -> Any:
-        pass
         return glom(self.model_fields, f"{field_name}.{field}")
 
 
@@ -330,7 +322,7 @@ class TextualizeSettings(BaseSettings):
         title="Pytest Textualize Settings",
         pyproject_toml_depth=3,
         pyproject_toml_table_header=("tool", "textualize-settings"),
-        toml_file=locate("pyproject.toml"),
+        toml_file=TS_BASE_PATH / "pyproject.toml",
         env_file=".env",
         env_file_encoding="utf-8",
         env_ignore_empty=True,
@@ -338,28 +330,38 @@ class TextualizeSettings(BaseSettings):
         env_parse_none_str="None",
         extra="forbid",
     )
-    py_colors: int | None = Field(default=0, alias="PY_COLORS")
-    console_outputs: bool | None = Field(default=False, alias="CONSOLE_OUTPUTS")
-    tracebacks: TracebacksPyProjectSettingsModel = Field(
-        default_factory=TracebacksPyProjectSettingsModel
+    py_colors: int | None = Field(
+        default=0,
+        title="PY_COLORS",
+        alias="PY_COLORS",
+        description="This environment variable used for pytest to enforce terminal colors (location .env), see PY_COLORS",
+        frozen=True,
+        ge=0,
+        le=1,
     )
-    logging: LoggingPyProjectSettingsModel = Field(default_factory=LoggingPyProjectSettingsModel)
-    console: ConsolePyProjectSettingsModel = Field(default_factory=ConsolePyProjectSettingsModel)
-    verbosity: Verbosity = Field(default=Verbosity.NORMAL)
-    log_format: str | None = Field(
-        default="%(message)s", description="The logging.formatter template"
+    pytestconfig: pytest.Config = Field(
+        ...,
+        description=(
+            "This settings class must be initiated with pytestconfig, since there are configuration dependencies"
+        ),
+        title="pytest.config",
     )
-    pytestconfig: pytest.Config
+
+    tracebacks_settings: TracebacksPyProjectSettingsModel = Field(
+        default_factory=TracebacksPyProjectSettingsModel, alias="tracebacks"
+    )
+    logging_settings: LoggingPyProjectSettingsModel = Field(
+        default_factory=LoggingPyProjectSettingsModel, alias="logging"
+    )
+    console_settings: ConsolePyProjectSettingsModel = Field(
+        default_factory=ConsolePyProjectSettingsModel, alias="console"
+    )
+
     project: Mapping[str, Any] = Field(default_factory=dict, alias="project")
     pyproject: Mapping[str, Any] = Field(default_factory=dict, alias="project")
     tool: Mapping[str, Any] = Field(default_factory=dict)
     toml_file: Path | None = Field(default=None)
-    lock_file: Path | None = Field(default=None)
     build_system: Mapping[str, Any] = Field(default_factory=dict, alias="build-system")
-
-    @staticmethod
-    def get_field_value(field: FieldInfo, field_name: str) -> FieldInfo:
-        return getattr(field.default_factory, "model_fields")[field_name]
 
     @classmethod
     def settings_customise_sources(
@@ -379,19 +381,15 @@ class TextualizeSettings(BaseSettings):
 
     def model_post_init(self, context: Any, /) -> None:
         from _pytest.logging import get_option_ini
-        from dotenv import load_dotenv, find_dotenv
 
-        file = find_dotenv(".env", raise_error_if_not_found=True)
-        load_dotenv(file, verbose=True)
-
-        self.toml_file = self.model_config.get("toml_file")
-        from boltons.fileutils import iter_find_files
-        filenames = sorted(iter_find_files(str(self.pytestconfig.rootpath), '*.lock'))
-        if filenames:
-            self.lock_file = Path(filenames[-1])
-            self.pyproject = {"project": self.project, "tool": self.tool, "build-system": self.build_system}
-
-        self.logging.level = get_option_ini(self.pytestconfig, "log_level")
-        self.logging.tracebacks_show_locals = self.pytestconfig.getoption("--showlocals")
-        self.logging.log_time_format = get_option_ini(self.pytestconfig, "log_date_format")
-        self.tracebacks.show_locals = self.pytestconfig.getoption("--showlocals")
+        # self.toml_file = self.model_config.get("toml_file")
+        # from boltons.fileutils import iter_find_files
+        # filenames = sorted(iter_find_files(str(self.pytestconfig.rootpath), '*.lock'))
+        # if filenames:
+        #     self.lock_file = Path(filenames[-1])
+        #     self.pyproject = {"project": self.project, "tool": self.tool, "build-system": self.build_system}
+        self.logging_settings.log_format = get_option_ini(self.pytestconfig, "log_format")
+        self.logging_settings.level = get_option_ini(self.pytestconfig, "log_level")
+        self.logging_settings.tracebacks_show_locals = self.pytestconfig.getoption("--showlocals")
+        self.logging_settings.log_time_format = get_option_ini(self.pytestconfig, "log_date_format")
+        self.tracebacks_settings.show_locals = self.pytestconfig.getoption("--showlocals")

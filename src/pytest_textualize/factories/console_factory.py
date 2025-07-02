@@ -1,38 +1,21 @@
-# Project : pytest-textualize
-# File Name : console_factory.py
-# Dir Path : src/pytest_textualize/textualize
 from __future__ import annotations
 
 import sys
 from io import StringIO
-from typing import TYPE_CHECKING
 
 import pytest
 from rich.console import Console
 
-
-from pytest_textualize.plugin import console_key
-from pytest_textualize.plugin import error_console_key
-from pytest_textualize.plugin import settings_key
-from pytest_textualize.textualize.logging import TextualizeConsoleLogRender
-
-if TYPE_CHECKING:
-    from pytest_textualize.settings import ConsolePyProjectSettingsModel
+from pytest_textualize import Textualize
 
 
 class ConsoleFactory:
-    @staticmethod
-    def check_settings(config: pytest.Config) -> ConsolePyProjectSettingsModel:
-
-        textualize_settings = config.stash.get(settings_key, None)
-        assert textualize_settings, "No settings found"
-        assert textualize_settings.console, "No console settings found"
-        return textualize_settings.console
 
     @staticmethod
     def console_null(config: pytest.Config) -> Console:
         # noinspection PyProtectedMember
         from rich._null_file import NullFile
+        from pytest_textualize.plugin import console_key
 
         null_console = Console(file=NullFile(), stderr=False)
         config.stash[console_key] = null_console
@@ -40,11 +23,19 @@ class ConsoleFactory:
 
     @staticmethod
     def console_stderr(config: pytest.Config) -> Console:
-        return ConsoleFactory.console_stdout(config, stderr=True)
+        from pytest_textualize.plugin import error_console_key
+
+        console = ConsoleFactory.console_stdout(config, stderr=True)
+        assert console.stderr is True, "error console should write to stderr only"
+        config.stash[error_console_key] = console
+        return console
 
     @staticmethod
     def console_stdout(config: pytest.Config, stderr: bool = False) -> Console:
-        console_settings = ConsoleFactory.check_settings(config)
+        from pytest_textualize.plugin import console_key
+        from pytest_textualize.plugin import error_console_key
+
+        console_settings = Textualize.settings(config).console_settings
         console = (
             config.stash.get(error_console_key, None)
             if stderr
@@ -62,15 +53,15 @@ class ConsoleFactory:
             theme = console_settings.get_theme(console_settings.color_system)
             if stderr:
                 console = Console(
+                    log_time=False,
                     stderr=True,
-                    style="red",
                     force_interactive=False,
                     theme=theme,
                     **exclude_none_unset,
                 )
             else:
-                console = Console(stderr=False, theme=theme, **exclude_none_unset)
-            console = ConsoleFactory.redirect_log_render(console)
+                console = Console(stderr=False, theme=theme, log_time=False, **exclude_none_unset)
+            # console = ConsoleFactory.redirect_log_render(console)
             config.stash.setdefault(console_key, console)
 
         return console
@@ -80,16 +71,16 @@ class ConsoleFactory:
         """
         This console does not require to be in stash since he works with strings
         """
-        console_settings = ConsoleFactory.check_settings(config)
+        console_settings = Textualize.settings(config).console_settings
         exclude_none = console_settings.model_dump(exclude_none=True)
         return Console(file=StringIO(), stderr=False, **exclude_none)
 
-    @staticmethod
-    def redirect_log_render(console: Console) -> Console:
-        render = getattr(console, "_log_render")
-        console._log_render = TextualizeConsoleLogRender(
-            show_time=render.show_time,
-            show_path=render.show_path,
-            time_format=render.time_format,
-        )
-        return console
+    # @staticmethod
+    # def redirect_log_render(console: Console) -> Console:
+    #     textualize().logging_config()
+    #     render = getattr(console, "_log_render")
+    #     console._log_render = LoggingConfig.create_console_render(
+    #         show_time=render.show_time,
+    #         show_path=render.show_path,
+    #     )
+    #     return console

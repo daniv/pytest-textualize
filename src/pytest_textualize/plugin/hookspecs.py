@@ -9,13 +9,14 @@ import pytest
 
 if TYPE_CHECKING:
     from rich.console import Console
-    from pytest_textualize.plugin import PytestPluginType
+    from pytest_textualize.typist import PytestPluginType
     from pytest_textualize.settings import TextualizeSettings
-    from rich.console import RenderableType
 
 
 @pytest.hookspec(historic=True)
-def pytest_console_and_settings(console: Console, error_console: Console, settings: TextualizeSettings) -> None:
+def pytest_console_and_settings(
+    console: Console, error_console: Console, settings: TextualizeSettings
+) -> None:
     """Provides the framework settings and the rich console,
 
     :param error_console: and sys. stderr console

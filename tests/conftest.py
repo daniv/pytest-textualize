@@ -5,16 +5,17 @@ from typing import TYPE_CHECKING
 import pytest
 
 from helpers.manifest import ManifestDirectory
+from pytest_textualize import textualize
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from pytest_textualize.typist import TextualizeSettingsType
 
 pytest_plugins = "pytester"
 
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_cmdline_main(config: pytest.Config) -> pytest.ExitCode | int | None:
-    import re
     if not "--strict-markers" in config.invocation_params.args:
         config.known_args_namespace.strict_markers = True
         config.option.strict_markers = True
@@ -78,3 +79,9 @@ class TextualizePytester:
 
     def make_conftest(self, source: str) -> Path:
         return self.pytester.makeconftest(source)
+
+
+
+@pytest.fixture(scope="session", autouse=False, name="settings")
+def setup_settings(pytestconfig: pytest.Config) -> TextualizeSettingsType:
+    return textualize().init_settings(pytestconfig)

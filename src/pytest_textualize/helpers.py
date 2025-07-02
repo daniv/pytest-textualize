@@ -1,16 +1,11 @@
-# Project : pytest-textualize
-# File Name : helpers.py
-# Dir Path : src/pytest_textualize
 from __future__ import annotations
 
 import os
 from enum import Enum
 from typing import Any
 from typing import NoReturn
-from typing import Protocol
 from typing import TYPE_CHECKING
 from typing import TypeGuard
-from typing import TypeVar
 from typing import get_args
 
 if TYPE_CHECKING:
@@ -51,7 +46,7 @@ def get_int_opt(opt_name: str, string: str) -> int:
         )
 
 
-def get_list_opt(opt_name: str, string: str | list[str] | tuple[str, ...]) -> list[str]:
+def get_list_opt(opt_name: str, string: str | ListStr | tuple[str, ...]) -> ListStr | NoReturn:
     if isinstance(string, str):
         return string.split()
     elif isinstance(string, (list, tuple)):
@@ -91,6 +86,15 @@ def literal_to_list(literal: Any) -> list[None | bool | bytes | int | str | Enum
 def is_list_of_strings(obj: object) -> TypeGuard[ListStr]:
     return isinstance(obj, list) and all(isinstance(item, str) for item in obj)
 
+
+def safe_getattr(obj: Any, attr_name: str) -> tuple[Any, Any]:
+    """Get attribute or any exception."""
+    try:
+        return None, getattr(obj, attr_name)
+    except Exception as error:
+        return error, None
+
+
 class SetEnv:
     """
     This class was taken from https://github.com/pydantic/pydantic-settings
@@ -110,3 +114,13 @@ class SetEnv:
     def clear(self) -> None:
         for n in self.envars:
             os.environ.pop(n)
+
+
+def assert_never(obj: NoReturn, msg: str) -> NoReturn:
+    """
+    Helper to make sure that we have covered all possible types.
+
+    This is mostly useful for ``mypy``, docs:
+    https://mypy.readthedocs.io/en/latest/literal_types.html#exhaustive-checks
+    """
+    raise TypeError(msg)

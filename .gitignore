@@ -329,3 +329,4 @@ cython_debug/
 #.idea/
 
 *.gz
+*.icls

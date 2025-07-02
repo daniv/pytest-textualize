@@ -12,20 +12,24 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
-from rich.highlighter import ReprHighlighter
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.text import Text
-from rich.traceback import PathHighlighter
 
+from pytest_textualize import ConsoleMessage
 from pytest_textualize import TS_BASE_PATH
-from pytest_textualize.textualize.verbose_log import Verbosity
-from pytest_textualize.textualize.console import is_markup
+from pytest_textualize import Textualize
+from pytest_textualize import Verbosity
+from pytest_textualize.factories.theme_factory import ThemeFactory
+from pytest_textualize.textualize.tracebacks import TextualizeTracebacks
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from pytest_textualize.typist import PanelType
+    from pytest_textualize.typist import ListStr
 
 
-def decode(string: bytes | str, encodings: list[str] | None = None) -> str:
+def decode(string: bytes | str, encodings: ListStr | None = None) -> str:
     if not isinstance(string, bytes):
         return string
 
@@ -40,57 +44,6 @@ def decode(string: bytes | str, encodings: list[str] | None = None) -> str:
 
 class TextualizeError(Exception):
     pass
-
-
-class ConsoleMessage(BaseModel):
-    """
-    Representation of a console message, providing utilities for formatting text
-    with tags, indentation, and sections.
-
-    The ConsoleMessage class is designed to represent text messages that might be
-    displayed in a console or terminal output. It provides features for managing
-    formatted text, such as stripping tags, wrapping text with specific tags,
-    indenting, and creating structured message sections.
-    """
-
-    text: str
-    debug: bool = Field(default=False)
-
-    def escape(self) -> Self:
-        self.text = self.text.replace("[", "\\[")
-        return self
-
-    @property
-    def stripped(self) -> str:
-        if is_markup(self.text):
-            txt = Text.from_markup(self.text)
-            return txt.plain
-        return self.text
-
-    def style(self, name: str) -> Self:
-        if self.text:
-            self.text = f"[{name}]{self.text}[/{name}]"
-            pass
-        return self
-
-    def indent(self, indent: str) -> ConsoleMessage:
-        if self.text:
-            self.text = f"\n{indent}".join(self.text.splitlines()).strip()
-            self.text = f"{indent}{self.text}"
-        return self
-
-    def make_section(self, title: str, indent: str = "", style: str | None = None) -> Self:
-        if not self.text:
-            return self.text
-
-        if self.text:
-            section = [f"[b]{title}:[/b]"] if title else []
-            if style:
-                self.style(style)
-            section.extend(self.text.splitlines())
-            self.text = f"\n{indent}".join(section).strip()
-
-        return self
 
 
 class PrettyException(BaseModel):
@@ -110,45 +63,51 @@ class PrettyException(BaseModel):
     location: ConsoleMessage | None = Field(
         default=None, description="A string representation of the location"
     )
-    link: str | None = Field(default=None, description="A string representation of the location")
-    isatty_link: str | None = Field(default=None)
 
     def model_post_init(self, context: Any, /) -> None:
+        repr_h = ThemeFactory.repr_highlighter()
+        path_h = ThemeFactory.path_highlighter()
+
         self.doc = ConsoleMessage(text=self.exception.__doc__, debug=True).make_section(
             "Exception doc", indent=self.indent
         )
-        r = ReprHighlighter()
-        self.message = ConsoleMessage(text=r(str(self.exception).strip()).markup, debug=True).make_section(
-            "Exception", indent=self.indent
-        )
+
+        self.message = ConsoleMessage(
+            text=repr_h(str(self.exception).strip()).markup, debug=True
+        ).make_section("Exception", indent=self.indent)
 
         if type(self).__name__ == "PrettyCalledProcessError":
             return None
-        h = PathHighlighter()
+
         if isinstance(self.exception, SyntaxError):
             frame_summary = self.exception
             path = Path(frame_summary.filename).relative_to(TS_BASE_PATH)
             loc = (
-                f"file: {h(path.as_posix()).markup}\n"
+                f"file: {path_h(path.as_posix()).markup}\n"
                 f"lineno: [repr.number]{frame_summary.lineno}[/]\n"
                 f"text: [python.string]{frame_summary.text.strip()}[/]\n"
             )
         else:
-            import traceback
-            frame_summary = traceback.extract_tb(self.exception.__traceback__)[-1]
-            path = Path(frame_summary.filename).relative_to(TS_BASE_PATH)
-            loc = (
-                f"file: {h(path.as_posix()).markup}\n"
-                f"function: [python.function]{frame_summary.name}[/]\n"
-                f"lineno: [repr.number]{frame_summary.lineno}[/]\n"
-                f"line: [#67A37C]{frame_summary.line}[/]\n"
+            exc_info = TextualizeTracebacks.from_exception(self.exception)
+            traceback_entry = exc_info.traceback[-1]
+            relative = Textualize.relative_path(traceback_entry.path)
+            link = Textualize.create_link(
+                str(traceback_entry.path),
+                traceback_entry.lineno,
+                sys.stdout.isatty(),
+                use_click=True,
             )
-        if sys.stdout.isatty():
-            loc += f"location: [link={path}:{frame_summary.lineno}][blue]{path.name}:{frame_summary.lineno}[/link] <- click[/]"
-        self.link = f"{path}:{frame_summary.lineno}"
-        self.isatty_link = f"[link={path}:{frame_summary.lineno}]{path.name}:{frame_summary.lineno}[/link]"
+            statement = "\n".join(traceback_entry.statement.lines).strip()
+            statement = repr_h(statement).markup
+            loc = (
+                f"file = {path_h(relative.as_posix()).markup}\n"
+                f"function = [python.function]{traceback_entry.name}[/]\n"
+                f"lineno = [repr.number]{traceback_entry.lineno}[/]\n"
+                f"statement = [#67A37C]{statement}[/]\n"
+                f"{link.markup}[reset] [/]"
+            )
         self.location = ConsoleMessage(text=loc, debug=True).make_section(
-                "Crash Location", indent=self.indent
+            "Crash Location", indent=self.indent
         )
 
         return None
@@ -209,7 +168,9 @@ class TextualizeRuntimeError(TextualizeError):
         self.exc_typename = exc_typename
         self.exit_code = exit_code
         self._messages = messages or []
-        self._messages.insert(0, ConsoleMessage(text=reason))
+        self._messages.insert(0, ConsoleMessage(text=reason.strip()))
+
+        # self._messages.insert(0, ConsoleMessage(text=reason))
         self.ctx = ctx or {}
 
     def write(self, error_console: Console, verbose: Verbosity) -> None:
@@ -218,14 +179,15 @@ class TextualizeRuntimeError(TextualizeError):
         """
         panel = self.render(verbose=verbose)
         if panel:
-            error_console.print(p, style="bright_red")
+            error_console.print(Padding(panel, pad=(0, 0, 0, 1), style="bright_red"))
 
-    def render(self, verbose: Verbosity) -> Panel | None:
+    def render(self, verbose: Verbosity) -> PanelType | None:
         """
-        Write the error text to the provided IO iff there is any text to write.
+        Write the error text to the provided IO if there is any text to write.
         """
         debug = verbose >= Verbosity.NORMAL
         if text := self.get_text(debug=debug, strip=False):
+
             return Panel(
                 Text.from_markup(text), expand=False, title=f"[b]{self.exc_typename}[/b]", padding=1
             )
@@ -287,8 +249,10 @@ class TextualizeRuntimeError(TextualizeError):
             ConsoleMessage(text="\n".join(info or []), debug=False).style("#B4B4B8")
         ]
 
+        indent = f"    | "
+        # indent = f"    {chr(0x2022)} "
         if isinstance(exception, CalledProcessError):
-            error = PrettyCalledProcessError(exception=exception, indent="    | ")
+            error = PrettyCalledProcessError(exception=exception, indent=indent)
             messages = [
                 error.doc.style("white"),
                 error.message,
@@ -297,13 +261,9 @@ class TextualizeRuntimeError(TextualizeError):
                 # error.command_message,
             ]
         elif isinstance(exception, Exception):
-            error = PrettyException(exception=exception, indent="    | ")
-            ctx = {"link": error.link, "isatty.link": error.isatty_link}
-            messages = [
-                error.doc.style("white"), error.message,
-                error.location,
-                *messages
-            ]
+            error = PrettyException(exception=exception, indent=indent)
+            # ctx = {"link": error.link}
+            messages = [error.doc.style("white"), error.message, error.location, *messages]
         return cls(reason, repr(type(exception)), messages, ctx=ctx)
 
     def append(self, message: str | ConsoleMessage) -> Self:

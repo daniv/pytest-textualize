@@ -1,31 +1,38 @@
-# Project : pytest-textualize
-# File Name : model.py
-# Dir Path : src/pytest_textualize/plugins/pytest_richtrace/richtrace
 from __future__ import annotations
 
+import sys
 from enum import StrEnum
 from pathlib import Path
 from typing import ClassVar
-from typing import Self
+from typing import ParamSpec
+from typing import TYPE_CHECKING
 from typing import Type
 from typing import TypeVar
 
 import pytest
-from _pytest.pathlib import absolutepath
-from _pytest.pathlib import bestrelpath
 from pendulum import Interval
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import computed_field
 from pydantic import field_serializer
-from pydantic import model_validator
 from pydantic_extra_types.pendulum_dt import DateTime
-from rich.repr import auto
 from pytest import CollectReport
-from rich.traceback import Traceback
+from rich.console import ConsoleRenderable
+from rich.console import Group
+from rich.panel import Panel
+from rich.repr import auto
+from rich.syntax import Syntax
+from rich.text import Text
 
-from pytest_textualize.plugin.exceptions import TextualizeRuntimeError
+from pytest_textualize import Textualize
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from rich.console import RenderableType
+    from pytest_textualize.typist import PanelType
+    from rich.console import Console
+
 
 Marker = str
 PerfTime = float
@@ -33,6 +40,7 @@ NodeId = str
 ModuleId = str
 ItemId = NodeId | ModuleId
 E = TypeVar("E", bound=BaseException, covariant=True)
+P = ParamSpec("P")
 
 
 class TestStage(StrEnum):
@@ -86,13 +94,113 @@ class XfailInfo(BaseModel):
 class WarningReport(BaseModel):
     """Simple structure to hold warnings information captured by ``pytest_warning_recorded``."""
 
-    msg_256: str
-    messages: list[str] = Field(default_factory=list, description="User friendly messages about the warning.")
-    nodeid: str | None = Field(default=None, description="File system location of the source of the warning.")
-    category: Type[Warning] = Field(default=None, description="File system category of the source of the warning.")
-    warning_message_filename: str | None = Field(default=None, description="File system location of the warning.")
-    warning_message_lineno: int | None = Field(default=None, description="File system location lineno of the warning.")
-    count_towards_summary: ClassVar[bool] = True
+    msg_256: str = Field(exclude=True)
+    messages: list[str] = Field(
+        default_factory=list,
+        description="User friendly messages about the warning.",
+        title="Messages",
+    )
+    nodeid: str | None = Field(
+        default=None,
+        description="The pytest nodeid on the warning",
+        alias="nodeid",
+        title="Node Id",
+    )
+    category: Type[Warning] = Field(
+        default=None,
+        description="Category of the source of the warning.",
+        exclude=True,
+        title="Category Description",
+    )
+    filename: str | None = Field(
+        default=None, description="File system file location of the warning.", title="File Path"
+    )
+    lineno: int | None = Field(
+        default=None, description="File system lineno of the warning.", title="Line #"
+    )
+    count_towards_summary: ClassVar[bool] = Field(
+        default=True,
+        description="Whether the warning should be counted as a summary of the warning.",
+        exclude=True,
+    )
+
+    def render(self, console: Console) -> None:
+        from rich.table import Table
+        from rich.pretty import Pretty
+
+        repr_h = Textualize.theme_factory().repr_highlighter()
+        path_h = Textualize.theme_factory().path_highlighter()
+
+        items: list[ConsoleRenderable] = []
+        if hasattr(self.category, "__doc__"):
+            items.append(
+                Panel(
+                    Text(f"{self.category.__doc__}", "#48abb1", justify="center"),
+                    border_style="#E3835B",
+                )
+            )
+        items_table = Table.grid(padding=(0, 1), expand=False)
+        items_table.add_column(justify="right")
+        for key, field_info in self.model_fields.items():
+            highlighter = repr_h
+            if field_info.exclude:
+                continue
+            value = getattr(self, key)
+            if key == "filename":
+                value = Path(self.filename).as_posix()
+                highlighter = path_h
+            items_table.add_row(
+                f"[inspect.attr]{field_info.title}[/] [inspect.equals] =[/]",
+                Pretty(value, highlighter=highlighter),
+            )
+        if sys.stdout.isatty():
+            items_table.add_row(
+                f"[inspect.attr]link[/] [inspect.equals] =[/]",
+                f"[bright_blue][link={self.filename}:{self.lineno}]{Path(self.filename).name}:{self.lineno}[/link] ⮄ click[/]",
+            )
+        items.append(items_table)
+
+        p = Panel.fit(
+            Group(*items),
+            title=f"[#B75742]Warning Report for [/][python.builtin]{self.category.__name__}[/]",
+            border_style="#9d4a39",
+            padding=(0, 1),
+        )
+        console.print(p)
+
+    def _render(self) -> Iterable[RenderableType]:
+        pass
+
+        #
+        # if hasattr(self.category, "__doc__"):
+        #     key_text = Text.assemble((self.category.__doc__, "inspect.help",))
+        #     # yield Panel(
+        #     #     Pretty(key_text, highlighter=repr_h),
+        #     #     border_style="inspect.value.border",
+        #     # )
+        #     yield Panel(
+        #         key_text,
+        #         border_style="inspect.value.border",
+        #     )
+        #
+        # items_table = Table.grid(padding=(0, 1), expand=False)
+        # items_table.add_column(justify="right")
+        #
+        # for key, field_info in self.model_fields.items():
+        #     if field_info.exclude:
+        #         continue
+        #     value = safe_getattr(self, key)
+        #     highlighter = repr_h
+        #     if key == "filename":
+        #         value = Path(self.filename).relative_to(TS_BASE_PATH).as_posix()
+        #         highlighter = path_h
+        #
+        #     key_text = Text.assemble(
+        #         (field_info.title, "inspect.attr", ),
+        #         (" =", "inspect.equals"),
+        #     )
+        #     items_table.add_row(key_text, Pretty(value, highlighter=highlighter))
+        # yield items_table
 
 
 @auto
@@ -108,7 +216,6 @@ class Timings(BaseModel):
     finish: DateTime | None = None
     precise_start: PerfTime = 0.0
     precise_finish: PerfTime = 0.0
-
 
     @property
     def timezone_name(self) -> str:
@@ -180,6 +287,7 @@ class Timings(BaseModel):
             return ""
         return self.start.to_time_string()
 
+
 class CollectStats(BaseModel):
     total_errors: int = Field(default=0, alias="errors")
     total_skipped: int = Field(default=0, alias="skipped")
@@ -203,36 +311,38 @@ class CollectStats(BaseModel):
         yield "selected", self.selected
 
 
-class Error(BaseModel):
+class ErrorInfo(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    when: str
-    nodeid: str
-    exception: BaseException | None = Field(default=None, alias="exception")
-    collect_report: pytest.CollectReport | None = None
-    test_report: pytest.TestReport | None = None
-    runtime_error: TextualizeRuntimeError | None = Field(default=None)
-    traceback: Traceback | None = Field(default=None)
-    # exception_info: pytest.ExceptionInfo | None = Field(default=None)
+    exception: BaseException = Field(alias="exception")
+    collect_report: pytest.CollectReport = Field(alias="report")
+    rich_report: Panel
+    error_syntax: Syntax = Field(alias="syntax")
 
 
 @auto
 class TestCollectionRecord(Timings):
-    errors: dict[ModuleId, Error] = Field(default_factory=dict)
+    errors: dict[ModuleId, ErrorInfo] = Field(default_factory=dict)
     skip: dict[NodeId, list[SkipInfo]] = Field(default_factory=dict)
     skip_reports: dict[NodeId, CollectReport] = Field(default_factory=dict)
 
     xfail: dict[NodeId, list[XfailInfo]] = Field(default_factory=dict)
-    # deselected: list[NodeId] = Field(default_factory=list)
     stats: CollectStats = Field(default_factory=CollectStats)
-
-    @classmethod
-    def create_error_model(
-            cls, when: str, nodeid: str) -> Error:
-        return Error(when=when, nodeid=nodeid)
 
     @property
     def errors_count(self) -> int:
         return len(self.errors.keys())
+
+    def register_error(
+        self,
+        nodeid: str,
+        exception: BaseException,
+        pytest_report: pytest.CollectReport,
+        rich_report: PanelType,
+        syntax: Syntax,
+    ) -> None:
+        self.errors[nodeid] = ErrorInfo(
+            exception=exception, report=pytest_report, rich_report=rich_report, syntax=syntax
+        )
 
     # @field_serializer("errors")
     # def serialize_exception(
@@ -249,3 +359,7 @@ class TestCollectionRecord(Timings):
 class TestRunResults(Timings):
     collect: TestCollectionRecord | None = Field(default=None)
     warnings: list[WarningReport] = Field(default_factory=list)
+
+    def create_collect(self, precise_start: PerfTime, start: DateTime) -> TestCollectionRecord:
+        self.collect = TestCollectionRecord(precise_start=precise_start, start=start)
+        return self.collect

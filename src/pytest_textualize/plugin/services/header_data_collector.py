@@ -6,18 +6,18 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Generator
-from typing import MutableMapping
+from typing import Any
 from typing import TYPE_CHECKING
 
 import pytest
+from pluggy._manager import DistFacade
 
 from pytest_textualize import TextualizePlugins
 
 if TYPE_CHECKING:
+    from collections.abc import Generator
     from collections.abc import Iterator
-    from typing import Any
-    from pluggy._manager import DistFacade
+    from collections.abc import MutableMapping
 
 to_kebab_case = lambda s: s.lower().replace(" ", "_")
 
@@ -114,6 +114,7 @@ class PluggyCollectorService:
         assert self.pluginmanager is not None
         from pprint import saferepr
 
+        # ------------------------------------ if self.value and not (isclass(obj) or callable(obj) or ismodule(obj)):
         names: list[dict[str, str]] = []
         for name, plugin in self._iter_name_plugin():
             if plugin is None:
@@ -172,6 +173,7 @@ def sysexec(self, *argv: os.PathLike[str], **popen_opts: Any) -> str:
         )
     return stdout
 
+
 class PoetryCollectorService:
     name = TextualizePlugins.POETRY_COLLECTOR_SERVICE
 
@@ -185,16 +187,20 @@ class PoetryCollectorService:
             cmd = "poetry --version"
             p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, shell=False)
             stdout, _ = p.communicate()
-            poetry_version = re.findall(r"\d*\.\d+\.\d+", stdout.decode('utf-8'))[0]
+            poetry_version = re.findall(r"\d*\.\d+\.\d+", stdout.decode("utf-8"))[0]
             from pytest_textualize.plugin import settings_key
+
             settings = config.stash.get(settings_key, None)
             from pytest_textualize import Verbosity
+
             if config.getoption("--trace-config") or settings.verbosity >= Verbosity.VERY_VERBOSE:
                 cmd = "poetry show -T -l"
-                p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
+                p = subprocess.Popen(
+                    shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False
+                )
                 stdout, stderr = p.communicate()
                 if stdout:
-                    packages = self.generate_output(stdout.decode('utf-8').splitlines())
+                    packages = self.generate_output(stdout.decode("utf-8").splitlines())
         except subprocess.CalledProcessError as e:
             pass
 
@@ -203,7 +209,6 @@ class PoetryCollectorService:
             data["packages"] = packages
         return data
 
-
     @staticmethod
     def generate_output(lines: list[str]):
         from importlib.metadata import metadata
@@ -211,6 +216,7 @@ class PoetryCollectorService:
         packages = []
         packs = tuple(map(lambda x: tuple(filter(len, x.split(" ")))[:3], lines))
         from pydantic_extra_types.semantic_version import SemanticVersion
+
         for name, current_ver, latest_ver in packs:
             try:
                 comp = SemanticVersion.validate_from_str(str(current_ver)).compare(str(latest_ver))
